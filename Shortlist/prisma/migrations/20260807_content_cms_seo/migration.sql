@@ -1,3 +1,0 @@
-ALTER TABLE "ContentPage" ADD COLUMN IF NOT EXISTS "coverImageUrl" TEXT;
-ALTER TABLE "ContentPage" ADD COLUMN IF NOT EXISTS "seoTitle" TEXT;
-ALTER TABLE "ContentPage" ADD COLUMN IF NOT EXISTS "seoDescription" TEXT;

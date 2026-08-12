@@ -1,1 +1,0 @@
-INSERT INTO "public"."PromoCode" ("id", "code", "durationMin", "isActive", "createdAt", "updatedAt") VALUES ('cmo8pihyi001iuj0kxbhhhe84', 'ANKURPRACTICE', 10, true, '2026-04-21 14:16:08.934', '2026-04-21 14:16:08.934');
