@@ -1,0 +1,156 @@
+{
+  "generatedAt": "2026-07-21T11:51:11.752Z",
+  "baseUrl": "http://localhost:3001",
+  "perfCompany": "PerfTest QA Co",
+  "performance": [
+    {
+      "tier": 10,
+      "candidatesInDb": 105,
+      "loginMs": 248,
+      "parallelWallMs": 931,
+      "slowestApiMs": 929,
+      "candidatesApiMs": 344,
+      "adminHtmlMs": 39,
+      "apis": {
+        "auth session": {
+          "ms": 9,
+          "status": 200
+        },
+        "dashboard": {
+          "ms": 535,
+          "status": 200
+        },
+        "sessions": {
+          "ms": 929,
+          "status": 200
+        }
+      }
+    },
+    {
+      "tier": 50,
+      "candidatesInDb": 105,
+      "loginMs": 71,
+      "parallelWallMs": 626,
+      "slowestApiMs": 625,
+      "candidatesApiMs": 334,
+      "adminHtmlMs": 27,
+      "apis": {
+        "auth session": {
+          "ms": 11,
+          "status": 200
+        },
+        "dashboard": {
+          "ms": 347,
+          "status": 200
+        },
+        "sessions": {
+          "ms": 625,
+          "status": 200
+        }
+      }
+    },
+    {
+      "tier": 105,
+      "candidatesInDb": 105,
+      "loginMs": 62,
+      "parallelWallMs": 673,
+      "slowestApiMs": 672,
+      "candidatesApiMs": 309,
+      "adminHtmlMs": 33,
+      "apis": {
+        "auth session": {
+          "ms": 10,
+          "status": 200
+        },
+        "dashboard": {
+          "ms": 422,
+          "status": 200
+        },
+        "sessions": {
+          "ms": 672,
+          "status": 200
+        }
+      }
+    }
+  ],
+  "razorpay": [
+    {
+      "step": "Create order",
+      "status": 200,
+      "ok": true,
+      "elapsedMs": 178,
+      "detail": "orderId=order_TG8tGLWCaJ0GHH amountPaise=2500"
+    },
+    {
+      "step": "Verify invalid signature",
+      "status": 400,
+      "ok": false,
+      "elapsedMs": 79,
+      "detail": "Payment signature verification failed."
+    },
+    {
+      "step": "Verify valid HMAC (simulated payment)",
+      "status": 200,
+      "ok": true,
+      "elapsedMs": 134,
+      "detail": "VERIFIED"
+    },
+    {
+      "step": "Start practice after payment",
+      "status": 200,
+      "ok": true,
+      "elapsedMs": 261,
+      "detail": "sessionId=cmrulef01000pv9n8985gsinb → user would redirect to /interview/cmrulef01000pv9n8985gsinb"
+    },
+    {
+      "step": "Validation error (empty name / bad email)",
+      "status": 400,
+      "ok": false,
+      "elapsedMs": 5,
+      "detail": "Too small: expected string to have >=1 characters"
+    }
+  ],
+  "mobile": {
+    "ok": true,
+    "shots": [
+      {
+        "url": "http://localhost:3001/candidate",
+        "file": "mobile-candidate-home.png",
+        "name": "Candidate homepage",
+        "filePath": "C:\\uhired\\Shortlist\\docs\\qa-artifacts\\2026-07-21\\mobile-candidate-home.png",
+        "metrics": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "hasHorizontalOverflow": false,
+          "bodyHeight": 1744
+        }
+      },
+      {
+        "url": "http://localhost:3001/company-login",
+        "file": "mobile-company-login.png",
+        "name": "Company login (pre-admin)",
+        "filePath": "C:\\uhired\\Shortlist\\docs\\qa-artifacts\\2026-07-21\\mobile-company-login.png",
+        "metrics": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "hasHorizontalOverflow": false,
+          "bodyHeight": 913
+        }
+      },
+      {
+        "url": "http://localhost:3001/admin",
+        "file": "mobile-admin-dashboard.png",
+        "name": "Admin dashboard (logged in)",
+        "filePath": "C:\\uhired\\Shortlist\\docs\\qa-artifacts\\2026-07-21\\mobile-admin-dashboard.png",
+        "metrics": {
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "hasHorizontalOverflow": false,
+          "elementsPastViewport": 0,
+          "bodyHeight": 3898
+        }
+      }
+    ],
+    "outDir": "C:\\uhired\\Shortlist\\docs\\qa-artifacts\\2026-07-21"
+  }
+}

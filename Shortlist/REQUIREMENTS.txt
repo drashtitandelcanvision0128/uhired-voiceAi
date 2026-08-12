@@ -1,0 +1,648 @@
+================================================================================
+  UHIRED (Shortlist) — PROJECT RESTRUCTURE & FEATURE REQUIREMENTS
+  Document Type : Planning / Requirements only (NO code in this file)
+  Version       : 1.0
+  Date          : 29 June 2026
+  Total Timeline: 12 working days (approx. 2.5 weeks)
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+  1. Project Overview
+  2. Current State (Repo Analysis)
+  3. Problems to Fix
+  4. Target Architecture & Folder Structure
+  5. Design System Rules
+  6. Feature Requirements (Frontend)
+  7. Feature Requirements (Backend & API Keys)
+  8. What NOT to Build (Guardrails)
+  9. Environment Variables
+  10. Timeline — Phase-wise Deliverables
+  11. Acceptance Criteria (per phase)
+  12. Testing Checklist
+  13. Open Decisions (defaults suggested)
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+Product Name  : Uhired (AI Interview Platform)
+Stack         : Next.js 16 (App Router) · TypeScript · Prisma · PostgreSQL
+                Tailwind CSS 4 · OpenAI · Razorpay · SMTP · S3/Supabase Storage
+
+Primary Goal  :
+  - Restructure the project into a clean, scalable structure
+  - Add an attractive marketing frontend (Home, About, Contact Us)
+  - Make the backend secure and maintainable with proper API-key handling
+  - Do NOT create extra models, dialogs, or duplicate code
+
+Success Looks Like :
+  - A professional marketing Home page at "/"
+  - "/about" and "/contact" pages live
+  - Practice flow on a separate route (e.g. "/practice") — linked from the Home CTA
+  - All API keys are server-only and validated on boot
+  - `lib/` folder organized — the flat set of 59 files grouped logically
+  - Build passes, routes do not break, and existing admin/candidate/interview flows remain intact
+
+================================================================================
+2. CURRENT STATE (REPO ANALYSIS)
+================================================================================
+
+2.1 EXISTING ROUTES (Pages)
+----------------------------
+  /                          → Practice interview + payment (Razorpay) — NOT marketing
+  /company-login             → Company admin login
+  /admin                     → Company admin dashboard (protected)
+  /candidate                 → Candidate invite verification
+  /interview/[sessionId]     → Live AI interview room
+  /share/scorecard/[token]   → Public scorecard share
+  /master-login              → Master admin login
+  /master/*                  → Master admin (companies, promo codes, overview)
+
+2.2 EXISTING API ROUTES (Grouped)
+----------------------------------
+  /api/admin/*               → Requirements, sessions, candidates, company settings
+  /api/ai/*                  → generate-questions, relevancy (OpenAI)
+  /api/candidate/*           → verify invite
+  /api/company-auth/*        → login, logout, session
+  /api/interview/*           → turn, video, realtime, complete (OpenAI realtime)
+  /api/master/*              → companies, promo codes, practice sessions
+  /api/practice/*            → start, payment order/verify/webhook (Razorpay)
+  /api/share/*               → scorecard PDF
+
+2.3 EXISTING DATABASE MODELS (Prisma — keep as-is, no new unless required)
+----------------------------------------------------------------------------
+  PromoCode, Company, Requirement, RequirementInvite, RequirementQuestion,
+  Candidate, InterviewSession, InterviewQuestion, InterviewTurn,
+  Scorecard, ScorecardShareLink, PracticePayment, ScoringBatchJob
+
+  → OPTIONAL for the contact form: `ContactMessage` model (decide in Phase 3)
+  → Any other new model only if there is a real feature need
+
+2.4 EXISTING INTEGRATIONS (API Keys)
+-------------------------------------
+  OPENAI_API_KEY             → Realtime interview, scoring, question generation
+  RAZORPAY_KEY_ID/SECRET     → Practice payment
+  NEXT_PUBLIC_RAZORPAY_KEY_ID→ Client checkout only (public by design)
+  SMTP_*                     → Invite emails (Nodemailer)
+  SUPABASE_*                 → Storage (legacy/backfill)
+  AWS_*                      → S3 video storage (production)
+  ADMIN_PORTAL_KEY           → Company admin auth
+  MASTER_ADMIN_KEY           → Master admin auth
+  DATABASE_URL / DIRECT_URL  → PostgreSQL
+
+2.5 CURRENT STRUCTURE GAPS
+---------------------------
+  [X] No marketing route group — Home = practice form (mixed concerns)
+  [X] No About / Contact pages
+  [X] lib/ — 59 files flat, no integrations/ subfolder
+  [X] No centralized env validation (src/lib/env.ts missing)
+  [X] components/ — only 6 files, no shared UI primitives
+  [X] API keys read directly via process.env everywhere
+  [X] Footer links (About Us, Privacy) — text only, no real pages
+  [X] No contact form backend
+
+================================================================================
+3. PROBLEMS TO FIX
+================================================================================
+
+  P1  Marketing vs App logic mixed on "/" route
+  P2  No consistent navbar/footer across public pages
+  P3  lib/ unmaintainable — hard to find OpenAI vs email vs auth code
+  P4  API key errors only at runtime, not at server start
+  P5  No SEO metadata on public pages
+  P6  Duplicate path risk (admin page exists at src/app/admin AND src\app\admin)
+
+  Fix approach: Route groups + lib reorganization + env module — NO rewrite of
+  working interview/admin flows.
+
+================================================================================
+4. TARGET ARCHITECTURE & FOLDER STRUCTURE
+================================================================================
+
+4.1 ROUTE GROUPS (Next.js App Router)
+--------------------------------------
+
+  src/app/
+  ├── layout.tsx                    # Root layout (fonts, globals) — KEEP
+  ├── globals.css                   # Design tokens — EXTEND, don't replace
+  │
+  ├── (marketing)/                  # NEW — public marketing site
+  │   ├── layout.tsx                # Marketing shell: navbar + footer
+  │   ├── page.tsx                  # Home (hero, features, CTA → /practice)
+  │   ├── about/
+  │   │   └── page.tsx              # About Us
+  │   └── contact/
+  │       └── page.tsx              # Contact Us + form
+  │
+  ├── (product)/                  # NEW group — move existing product routes
+  │   ├── practice/
+  │   │   └── page.tsx              # MOVE current src/app/page.tsx content here
+  │   ├── company-login/page.tsx    # MOVE from root
+  │   ├── candidate/page.tsx        # MOVE from root
+  │   ├── interview/[sessionId]/    # MOVE from root
+  │   └── share/scorecard/[token]/  # MOVE from root
+  │
+  ├── admin/                        # KEEP (middleware protected)
+  ├── master/                       # KEEP
+  ├── master-login/                 # KEEP
+  │
+  └── api/                          # KEEP structure, reorganize internals only
+      ├── contact/route.ts          # NEW — contact form POST
+      ├── admin/                    # existing
+      ├── ai/                       # existing
+      ├── candidate/                # existing
+      ├── company-auth/             # existing
+      ├── interview/                # existing
+      ├── master/                   # existing
+      ├── practice/                 # existing
+      └── share/                    # existing
+
+  URL mapping after restructure:
+    /           → Marketing Home (NEW)
+    /about      → About Us (NEW)
+    /contact    → Contact Us (NEW)
+    /practice   → Existing practice + payment flow (MOVED from /)
+    /admin      → unchanged
+    /interview  → unchanged
+
+4.2 COMPONENTS STRUCTURE
+-------------------------
+
+  src/components/
+  ├── ui/                           # NEW — minimal shared primitives
+  │   ├── button.tsx
+  │   ├── input.tsx
+  │   ├── textarea.tsx
+  │   └── card.tsx                  # wrap existing .card CSS class
+  │
+  ├── marketing/                    # NEW
+  │   ├── site-header.tsx           # Logo, nav links, CTA buttons
+  │   ├── site-footer.tsx           # Links, social, copyright
+  │   ├── hero-section.tsx
+  │   ├── how-it-works.tsx          # 3-step section
+  │   ├── features-grid.tsx
+  │   └── contact-form.tsx          # Client form → POST /api/contact
+  │
+  ├── company-interview-room.tsx    # KEEP
+  ├── master-shell.tsx              # KEEP
+  ├── scorecard-share-*.tsx         # KEEP
+  └── transcript-timeline.tsx       # KEEP
+
+  Rule: 1 reusable pattern per UI need. NO multiple dialog/modal variants.
+
+4.3 LIB STRUCTURE (Reorganize — move files, update imports)
+------------------------------------------------------------
+
+  src/lib/
+  ├── env.ts                        # NEW — Zod validation, server-only
+  ├── prisma.ts                     # KEEP
+  ├── constants.ts                  # KEEP
+  │
+  ├── auth/
+  │   ├── company-admin-auth.ts     # MOVE
+  │   ├── master-auth.ts            # MOVE
+  │   └── candidate-interview-auth.ts # MOVE
+  │
+  ├── integrations/
+  │   ├── openai/
+  │   │   ├── client.ts             # NEW wrapper (from openai.ts + openai-responses.ts)
+  │   │   ├── realtime.ts           # MOVE from openai.ts realtime parts
+  │   │   └── scoring.ts            # MOVE from scoring.ts (OpenAI calls only)
+  │   ├── razorpay/
+  │   │   └── client.ts             # MOVE from razorpay.ts
+  │   ├── email/
+  │   │   ├── smtp.ts               # MOVE from email.ts
+  │   │   └── invite-delivery.ts    # MOVE
+  │   └── storage/
+  │       └── video.ts              # MOVE from interview-video-storage.ts
+  │
+  ├── interview/                    # Domain logic — MOVE related files
+  │   ├── prompt.ts
+  │   ├── questions.ts
+  │   ├── duration.ts
+  │   ├── realtime-session.ts
+  │   └── grading/
+  │       ├── question-grading.ts
+  │       └── session-question-grading.ts
+  │
+  ├── scorecard/                    # MOVE scorecard-* files
+  ├── requirements/                 # MOVE requirement-* files
+  ├── candidate/                    # MOVE candidate-* files
+  └── utils/                        # Small pure helpers (codes, pricing, pdf-text-safe)
+
+  Rule: Move gradually per phase. Each phase ends with build passing.
+
+4.4 OPTIONAL (Phase 5+ — only if team prefers)
+-----------------------------------------------
+  src/server/
+  ├── services/     # Business logic extracted from API routes
+  └── validators/   # Shared Zod schemas for API input/output
+
+  → Skip initially. API routes + `lib/` are enough for the current scale.
+
+================================================================================
+5. DESIGN SYSTEM RULES
+================================================================================
+
+  Colors (existing CSS variables — USE these, don't invent new palette):
+    --primary:           #1d3557
+    --primary-container: #203854
+    --secondary:         #006a62
+    --background:        #eef0f4
+    --surface:           #ffffff
+
+  Fonts (already in root layout):
+    Headlines → Manrope (--font-headline)
+    Body      → Inter (--font-body)
+
+  UI Principles:
+    - Mobile-first responsive
+    - Sticky header on marketing pages
+    - Gradient CTA buttons (existing pattern from current home)
+    - .card class for elevated sections
+    - No new CSS framework — Tailwind 4 only
+    - Accessible: form labels, focus states, contrast ratio ≥ 4.5:1
+    - No heavy animations — subtle hover/transitions only
+
+  Marketing Home Sections (in order):
+    1. Hero — headline + subtext + primary CTA ("Start Practice") + secondary ("For Companies")
+    2. How It Works — 3 steps (Choose role → AI Interview → Get Scorecard)
+    3. Features — 4 cards (AI Interviewer, Real-time Feedback, Company Dashboard, Secure)
+    4. Social proof — stats or testimonial placeholders (static text OK for v1)
+    5. Final CTA banner → /practice
+    6. Footer — links to About, Contact, Company Login
+
+================================================================================
+6. FEATURE REQUIREMENTS — FRONTEND
+================================================================================
+
+6.1 HOME PAGE (/)
+-----------------
+  Must Have:
+    - Professional hero section with Uhired branding
+    - Clear value proposition (AI interview practice + company hiring tool)
+    - "Start Practice" button → /practice
+    - "Company Login" button → /company-login
+    - How it works (3 steps)
+    - Features grid (4 items minimum)
+    - Responsive navbar: Home | About | Contact | Company Login | Start Practice
+    - Footer with navigation links
+    - SEO: title, description, OpenGraph basic tags
+
+  Must NOT Have:
+    - Practice form on home page (moves to /practice)
+    - Razorpay script on marketing home
+    - Client-side API key usage
+
+6.2 ABOUT PAGE (/about)
+-----------------------
+  Must Have:
+    - Company/product story (who we are, why Uhired exists)
+    - Mission & vision (short paragraphs)
+    - What we offer: Practice mode + Company hiring workflows
+    - Simple team/company section (can be static for v1)
+    - CTA to /practice and /contact
+    - Same marketing layout (header + footer)
+
+6.3 CONTACT US PAGE (/contact)
+------------------------------
+  Must Have:
+    - Contact form fields: Name, Email, Subject, Message
+    - Client-side validation (required fields, email format)
+  - Submit → POST /api/contact
+    - Success message inline (NO modal dialog)
+    - Error message inline
+    - Optional: company email + office address (static text)
+    - Honeypot field (hidden) for basic spam protection
+
+  Must NOT Have:
+    - Multiple popup dialogs
+    - Third-party chat widget (v1)
+
+6.4 PRACTICE PAGE (/practice) — EXISTING FLOW RELOCATED
+---------------------------------------------------------
+  Must Have:
+    - Exact same functionality as current src/app/page.tsx
+    - Updated internal links if any pointed to "/"
+    - Same header style OR minimal product header with link back to marketing home
+
+================================================================================
+7. FEATURE REQUIREMENTS — BACKEND & API KEYS
+================================================================================
+
+7.1 ENV VALIDATION MODULE (src/lib/env.ts)
+------------------------------------------
+  Must Have:
+    - Zod schema for all required env vars
+    - server-only import
+    - Fail fast on missing OPENAI_API_KEY, DATABASE_URL in production
+    - Separate: server secrets vs NEXT_PUBLIC_* (only Razorpay public key)
+    - Typed export: env.OPENAI_API_KEY, env.DATABASE_URL, etc.
+    - Dev mode: warn on missing optional keys, don't crash
+
+7.2 INTEGRATION CLIENT PATTERN
+-------------------------------
+  Each external service = one module in src/lib/integrations/<provider>/
+
+  OpenAI:
+    - All fetch calls go through integration client
+    - Timeout: 30s default
+    - Error: typed IntegrationError (message safe for logs, no key leak)
+    - Used by: /api/ai/*, /api/interview/*/realtime, scoring
+
+  Razorpay:
+    - Server: RAZORPAY_KEY_SECRET only in integrations/razorpay/
+    - Client: NEXT_PUBLIC_RAZORPAY_KEY_ID unchanged
+    - Used by: /api/practice/payment/*
+
+  SMTP (Email):
+    - SMTP_PASS server-only
+    - Used by: invite emails, contact form (if email mode chosen)
+    - Existing SMTP_SEND_DELAY_MS, SMTP_MAX_RETRIES respected
+
+  Storage (S3 / Supabase):
+    - AWS_SECRET_ACCESS_KEY, SUPABASE_SERVICE_ROLE_KEY server-only
+    - No change to storage logic — only move files to integrations/storage/
+
+7.3 CONTACT API (POST /api/contact)
+------------------------------------
+  Request body:
+    { name: string, email: string, subject: string, message: string, honeypot?: string }
+
+  Behavior:
+    - Zod validate input
+    - Reject if honeypot filled (return 200 silently or 400 — pick one, document it)
+    - Rate limit: max 5 requests per IP per hour (in-memory OK for v1)
+    - Delivery mode (CHOOSE ONE for v1):
+        Option A (Recommended): Send email via existing SMTP to admin inbox
+        Option B: Save to ContactMessage table in DB
+        Option C: Both — ONLY if explicitly needed (avoid duplicate notifications)
+
+  Response:
+    { ok: true } on success
+    { error: "message" } on failure (no internal stack traces)
+
+  Must NOT:
+    - Store API keys in request/response
+    - Create admin UI for contact messages in v1
+
+7.4 EXISTING API ROUTES — NO BREAKING CHANGES
+----------------------------------------------
+  All existing endpoints keep same URLs and behavior.
+  Only internal refactor: process.env → env.* from validated module.
+
+================================================================================
+8. WHAT NOT TO BUILD (GUARDRAILS)
+================================================================================
+
+  DO NOT add:
+    - New Prisma models unless ContactMessage (if DB mode chosen) — nothing else
+    - Multiple Modal/Dialog components — use inline messages
+    - Admin panel for contact submissions (v1)
+    - Blog, pricing page, careers page (out of scope)
+    - New payment provider
+    - GraphQL layer
+    - Redux/Zustand state management
+    - Duplicate auth systems
+    - Generic "Logger" or "Audit" tables
+    - Wrapper components for every HTML element
+
+  DO NOT refactor in v1:
+    - Master admin UI
+    - Interview realtime flow (working production feature)
+    - Scoring batch jobs
+    - Prisma schema for core entities
+
+  KEEP changes minimal:
+    - Move files + update imports
+    - Add marketing pages
+    - Add env.ts + contact API
+    - Extract integration clients from existing code (no new abstractions beyond folder)
+
+================================================================================
+9. ENVIRONMENT VARIABLES
+================================================================================
+
+  Required (production):
+    DATABASE_URL
+    DIRECT_URL
+    OPENAI_API_KEY
+    ADMIN_PORTAL_KEY
+    NEXT_PUBLIC_APP_URL
+
+  Required (if practice payments enabled):
+    RAZORPAY_KEY_ID
+    RAZORPAY_KEY_SECRET
+    NEXT_PUBLIC_RAZORPAY_KEY_ID
+
+  Required (if email invites + contact form email mode):
+    SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+
+  Optional:
+    MASTER_ADMIN_KEY
+    SCORING_MODE, SCORING_MODEL
+    VIDEO_STORAGE_PROVIDER, AWS_*, SUPABASE_*
+    RAZORPAY_WEBHOOK_SECRET
+    PRACTICE_BASE_PRICE_RUPEES
+    CONTACT_TO_EMAIL (new — admin inbox for contact form; defaults to SMTP_FROM)
+
+  Security rules:
+    - Never commit .env or .env.production
+    - Update .env.example with CONTACT_TO_EMAIL when contact API is added
+    - NEXT_PUBLIC_* = only non-secret values (Razorpay public key, APP_URL)
+    - All other keys: server-only, never in "use client" components
+
+================================================================================
+10. TIMELINE — PHASE-WISE DELIVERABLES (12 WORKING DAYS)
+================================================================================
+
+------------------------------------------------------------------------------
+PHASE 0 — Discovery & Baseline                                    DAY 1
+------------------------------------------------------------------------------
+  Tasks:
+    - Map all routes, API endpoints, env var usage (grep process.env)
+    - List lib/ files → assign target folder per file
+    - Confirm contact delivery mode (Email via SMTP recommended)
+    - Confirm /practice URL for relocated home flow
+    - Backup: ensure main branch builds before any move
+
+  Deliverables:
+    - File move checklist (old path → new path)
+    - Risk list (broken imports, middleware paths)
+
+  Acceptance:
+    - Team agrees on structure in Section 4
+    - Contact mode decided
+
+------------------------------------------------------------------------------
+PHASE 1 — Foundation: env.ts + UI primitives                      DAY 2–3
+------------------------------------------------------------------------------
+  Tasks:
+    - Create src/lib/env.ts with Zod schema
+    - Create src/components/ui/ (button, input, textarea, card)
+    - Replace process.env in 2–3 critical files as proof (openai, prisma)
+    - npm run build passes
+
+  Deliverables:
+    - env.ts validated module
+    - 4 UI primitive components
+    - .env.example updated with any new vars
+
+  Acceptance:
+    - Server starts; missing DATABASE_URL fails clearly in prod mode
+    - No API keys in client bundle (verify build output)
+
+------------------------------------------------------------------------------
+PHASE 2 — Marketing Layout + Pages                              DAY 4–6
+------------------------------------------------------------------------------
+  Tasks:
+    - Create src/app/(marketing)/layout.tsx with site-header + site-footer
+    - Build Home page (hero, how-it-works, features, CTA)
+    - Build About page
+    - Build Contact page with contact-form component
+    - Add metadata (title, description) per page
+    - Move current page.tsx practice flow → (product)/practice/page.tsx
+    - Add redirect or replace / to marketing home
+
+  Deliverables:
+    - /, /about, /contact live and responsive
+    - /practice has old home functionality
+    - Consistent navbar/footer on all marketing pages
+
+  Acceptance:
+    - Mobile + desktop layout OK
+    - Lighthouse: no major layout shift on marketing pages
+    - All nav links work
+    - Practice flow still works end-to-end from /practice
+
+------------------------------------------------------------------------------
+PHASE 3 — Contact Backend                                       DAY 7–8
+------------------------------------------------------------------------------
+  Tasks:
+    - Create POST /api/contact route
+    - Zod validation + honeypot + rate limit
+    - Wire SMTP send to CONTACT_TO_EMAIL (or chosen mode)
+    - Connect contact-form.tsx to API
+    - Inline success/error states
+
+  Deliverables:
+    - Working contact form submission
+    - Rate limit active
+
+  Acceptance:
+    - Valid submission → admin receives email (or DB row if DB mode)
+    - Invalid email → 400 with clear message
+    - Spam honeypot → blocked
+    - 6th request in 1 hour from same IP → 429
+
+------------------------------------------------------------------------------
+PHASE 4 — lib/ Reorganization + Integration Clients             DAY 9–11
+------------------------------------------------------------------------------
+  Tasks:
+    - Create integrations/openai/client.ts — centralize OpenAI fetch
+    - Move razorpay.ts → integrations/razorpay/client.ts
+    - Move email.ts → integrations/email/smtp.ts
+    - Move auth files → lib/auth/
+    - Move interview/scorecard/requirements files per Section 4.3
+    - Update all imports (IDE + build)
+    - API routes use env.* instead of raw process.env
+
+  Deliverables:
+    - lib/ grouped by domain
+    - Zero broken imports
+    - Build + lint pass
+
+  Acceptance:
+    - grep "process.env" only in env.ts (except NEXT_PUBLIC in client components)
+    - Interview + admin + practice flows manually smoke-tested
+
+------------------------------------------------------------------------------
+PHASE 5 — Polish, Docs & Release Prep                           DAY 12
+------------------------------------------------------------------------------
+  Tasks:
+    - Remove dead code / unused imports
+    - Update README.md with new routes and env vars
+    - Footer links: About → /about, Contact → /contact
+    - Final responsive pass on marketing pages
+    - Deployment checklist (migrations, env keys, Docker)
+
+  Deliverables:
+    - Clean repo structure
+    - README updated
+    - Release checklist in README or docs/DEPLOYMENT.md (short)
+
+  Acceptance:
+    - Full smoke test checklist (Section 12) passed
+    - No console errors on marketing pages
+    - Stakeholder sign-off on design
+
+================================================================================
+11. ACCEPTANCE CRITERIA SUMMARY
+================================================================================
+
+  [ ] Marketing home at / is attractive and distinct from /practice
+  [ ] About and Contact pages complete with shared layout
+  [ ] Contact form works with backend (email or DB — per decision)
+  [ ] All API keys server-only and validated via env.ts
+  [ ] lib/ organized — no flat dump of 59 files
+  [ ] Existing admin, interview, candidate, master flows unchanged for users
+  [ ] No unnecessary new models or dialog components
+  [ ] Build, lint, typecheck pass
+  [ ] .env.example documents all required variables
+
+================================================================================
+12. TESTING CHECKLIST (Run before each phase merge)
+================================================================================
+
+  Routing:
+    [ ] GET /              → marketing home
+    [ ] GET /about         → about page
+    [ ] GET /contact       → contact page
+    [ ] GET /practice      → practice form + payment
+    [ ] GET /company-login → login page
+    [ ] GET /admin         → redirects if not authed
+    [ ] GET /interview/:id → interview room (existing session)
+
+  Contact:
+    [ ] Valid form submission → success message
+    [ ] Empty required field → validation error
+    [ ] Honeypot filled → silent reject
+    [ ] Rate limit exceeded → 429
+
+  Security:
+    [ ] View page source / network — no OPENAI_API_KEY, SMTP_PASS, AWS secrets
+    [ ] API routes return safe errors (no stack traces to client)
+
+  Regression:
+    [ ] Practice payment (Razorpay test mode) still works
+    [ ] Company login → admin dashboard
+    [ ] Candidate invite verify flow
+    [ ] Interview realtime session starts
+
+  Build:
+    [ ] npm run build
+    [ ] npm run lint
+
+================================================================================
+13. OPEN DECISIONS (Suggested Defaults)
+================================================================================
+
+  Decision                          | Default Recommendation
+  ----------------------------------|------------------------------------------
+  Contact form delivery             | Email via SMTP (no new DB model)
+  Practice page URL                 | /practice
+  Contact rate limit storage        | In-memory Map (upgrade to Redis later)
+  Privacy / Terms pages             | Out of scope v1 — footer links disabled or "#"
+  Design reference                  | Extend current Uhired palette (Section 5)
+  lib/server/ folder                | Skip for v1 — use lib/ only
+  Marketing content language          | English (Hindi optional later)
+
+================================================================================
+END OF REQUIREMENTS
+================================================================================
+
+Next step when implementation starts:
+  Phase 0 → confirm open decisions → begin Phase 1 (env.ts + UI primitives)
+
+No code should be written until this document is reviewed and approved.

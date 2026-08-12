@@ -1,0 +1,436 @@
+{
+  "suite": "interview-e2e-master",
+  "startedAt": "2026-07-22T07:29:37.337Z",
+  "finishedAt": "2026-07-22T07:29:53.660Z",
+  "total": 14,
+  "passed": 14,
+  "failed": 0,
+  "skipped": 0,
+  "ok": true,
+  "cases": [
+    {
+      "id": "test-speech-transcription",
+      "title": "Unit script: scripts/test-speech-transcription.mjs",
+      "requirement": null,
+      "status": "passed",
+      "durationMs": 853,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:29:38.235Z",
+          "level": "info",
+          "message": "    ✓ processCandidateTranscript never returns partial-looking fragments as final\n\nAll speech transcription tests passed."
+        }
+      ]
+    },
+    {
+      "id": "test-voice-activity-detection",
+      "title": "Unit script: scripts/test-voice-activity-detection.mjs",
+      "requirement": null,
+      "status": "passed",
+      "durationMs": 879,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:29:39.115Z",
+          "level": "info",
+          "message": "    ✓ extractAudioFrameFeatures derives speech-band ratio\n\nAll voice activity detection tests passed."
+        }
+      ]
+    },
+    {
+      "id": "verify-semantic-evaluation",
+      "title": "Unit script: scripts/verify-semantic-evaluation.mjs",
+      "requirement": null,
+      "status": "passed",
+      "durationMs": 78,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:29:39.193Z",
+          "level": "info",
+          "message": "  PASS: similar vectors score high\n\nAll 5 semantic evaluation checks passed."
+        }
+      ]
+    },
+    {
+      "id": "test-interview-live-phase",
+      "title": "Unit script: scripts/test-interview-live-phase.mjs",
+      "requirement": null,
+      "status": "passed",
+      "durationMs": 913,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:29:40.106Z",
+          "level": "info",
+          "message": "    ✓ status copy covers processing and speaking states\n\nAll interview live phase tests passed."
+        }
+      ]
+    },
+    {
+      "id": "test-interview-silence-fallback",
+      "title": "Unit script: scripts/test-interview-silence-fallback.mjs",
+      "requirement": null,
+      "status": "passed",
+      "durationMs": 820,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:29:40.926Z",
+          "level": "info",
+          "message": "    ✓ late substantive Whisper after turn-wait timeout reschedules with next question\n\nAll silence fallback simulation tests passed."
+        }
+      ]
+    },
+    {
+      "id": "test-interview-conversation-state",
+      "title": "Unit script: scripts/test-interview-conversation-state.mjs",
+      "requirement": null,
+      "status": "passed",
+      "durationMs": 848,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:29:41.774Z",
+          "level": "info",
+          "message": "    ✓ interviewer acknowledgements without questions are not treated as new questions\n\nAll conversation state FSM tests passed."
+        }
+      ]
+    },
+    {
+      "id": "test-transcript-confidence-validation",
+      "title": "Unit script: scripts/test-transcript-confidence-validation.mjs",
+      "requirement": null,
+      "status": "passed",
+      "durationMs": 841,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:29:42.615Z",
+          "level": "info",
+          "message": "    ✓ low-confidence instructions differ from silence check-in\n\nAll transcript confidence validation tests passed."
+        }
+      ]
+    },
+    {
+      "id": "test-interview-turn-latency",
+      "title": "Unit script: scripts/test-interview-turn-latency.mjs",
+      "requirement": null,
+      "status": "passed",
+      "durationMs": 839,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:29:43.454Z",
+          "level": "info",
+          "message": "    ✓ conversation manager preloads next predefined question hint\n\nAll interview turn latency tests passed."
+        }
+      ]
+    },
+    {
+      "id": "test-interview-intro",
+      "title": "Unit script: scripts/test-interview-intro.mjs",
+      "requirement": null,
+      "status": "passed",
+      "durationMs": 886,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:29:44.340Z",
+          "level": "info",
+          "message": "    ✓ default behavioral fallback is defined\n\nAll interview introduction tests passed."
+        }
+      ]
+    },
+    {
+      "id": "test-interview-transcript-capture",
+      "title": "Unit script: scripts/test-interview-transcript-capture.mjs",
+      "requirement": null,
+      "status": "passed",
+      "durationMs": 822,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:29:45.162Z",
+          "level": "info",
+          "message": "    ✓ empty Whisper transcript does not invent text but settles the utterance\n\nAll transcript capture simulation tests passed."
+        }
+      ]
+    },
+    {
+      "id": "test-interview-room-display",
+      "title": "Unit script: scripts/test-interview-room-display.mjs",
+      "requirement": null,
+      "status": "passed",
+      "durationMs": 857,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:29:46.020Z",
+          "level": "info",
+          "message": "    ✓ ending stage shows loading spinner\n\nAll interview room display tests passed."
+        }
+      ]
+    },
+    {
+      "id": "test-interview-timer",
+      "title": "Unit script: scripts/test-interview-timer.mjs",
+      "requirement": null,
+      "status": "passed",
+      "durationMs": 889,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:29:46.910Z",
+          "level": "info",
+          "message": "    ✓ resume after live interruption keeps elapsed time\n\nAll interview timer tests passed."
+        }
+      ]
+    },
+    {
+      "id": "test-interview-duration",
+      "title": "Unit script: scripts/test-interview-duration.mjs",
+      "requirement": null,
+      "status": "passed",
+      "durationMs": 814,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:29:47.724Z",
+          "level": "info",
+          "message": "    ✓ complete endedAt from durationSec matches allocated slot\n\nAll interview duration tests passed."
+        }
+      ]
+    },
+    {
+      "id": "qa-interview-e2e-comprehensive",
+      "title": "Comprehensive E2E suite",
+      "requirement": null,
+      "status": "passed",
+      "durationMs": 5934,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:29:53.659Z",
+          "level": "info",
+          "message": "  [interview-e2e-comprehensive] PASS: Restored session still handles repeat requests correctly \n\n=== Interview E2E Comprehensive Summary ===\nPassed: 29  Failed: 0  Skipped: 1\nJSON report: C:\\uhired\\Shortlist\\docs\\qa-artifacts\\2026-07-22\\interview-e2e-comprehensive-2026-07-22T07-29-53-614Z.json\nHTML report: C:\\uhired\\Shortlist\\docs\\qa-artifacts\\2026-07-22\\interview-e2e-comprehensive-latest.html"
+        }
+      ]
+    }
+  ],
+  "baseUrl": "http://localhost:3000",
+  "serverAvailable": true,
+  "suites": [
+    {
+      "suite": "interview-e2e-master",
+      "startedAt": "2026-07-22T07:29:37.337Z",
+      "finishedAt": "2026-07-22T07:29:53.660Z",
+      "total": 14,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "ok": true,
+      "cases": [
+        {
+          "id": "test-speech-transcription",
+          "title": "Unit script: scripts/test-speech-transcription.mjs",
+          "requirement": null,
+          "status": "passed",
+          "durationMs": 853,
+          "logs": [
+            {
+              "ts": "2026-07-22T07:29:38.235Z",
+              "level": "info",
+              "message": "    ✓ processCandidateTranscript never returns partial-looking fragments as final\n\nAll speech transcription tests passed."
+            }
+          ]
+        },
+        {
+          "id": "test-voice-activity-detection",
+          "title": "Unit script: scripts/test-voice-activity-detection.mjs",
+          "requirement": null,
+          "status": "passed",
+          "durationMs": 879,
+          "logs": [
+            {
+              "ts": "2026-07-22T07:29:39.115Z",
+              "level": "info",
+              "message": "    ✓ extractAudioFrameFeatures derives speech-band ratio\n\nAll voice activity detection tests passed."
+            }
+          ]
+        },
+        {
+          "id": "verify-semantic-evaluation",
+          "title": "Unit script: scripts/verify-semantic-evaluation.mjs",
+          "requirement": null,
+          "status": "passed",
+          "durationMs": 78,
+          "logs": [
+            {
+              "ts": "2026-07-22T07:29:39.193Z",
+              "level": "info",
+              "message": "  PASS: similar vectors score high\n\nAll 5 semantic evaluation checks passed."
+            }
+          ]
+        },
+        {
+          "id": "test-interview-live-phase",
+          "title": "Unit script: scripts/test-interview-live-phase.mjs",
+          "requirement": null,
+          "status": "passed",
+          "durationMs": 913,
+          "logs": [
+            {
+              "ts": "2026-07-22T07:29:40.106Z",
+              "level": "info",
+              "message": "    ✓ status copy covers processing and speaking states\n\nAll interview live phase tests passed."
+            }
+          ]
+        },
+        {
+          "id": "test-interview-silence-fallback",
+          "title": "Unit script: scripts/test-interview-silence-fallback.mjs",
+          "requirement": null,
+          "status": "passed",
+          "durationMs": 820,
+          "logs": [
+            {
+              "ts": "2026-07-22T07:29:40.926Z",
+              "level": "info",
+              "message": "    ✓ late substantive Whisper after turn-wait timeout reschedules with next question\n\nAll silence fallback simulation tests passed."
+            }
+          ]
+        },
+        {
+          "id": "test-interview-conversation-state",
+          "title": "Unit script: scripts/test-interview-conversation-state.mjs",
+          "requirement": null,
+          "status": "passed",
+          "durationMs": 848,
+          "logs": [
+            {
+              "ts": "2026-07-22T07:29:41.774Z",
+              "level": "info",
+              "message": "    ✓ interviewer acknowledgements without questions are not treated as new questions\n\nAll conversation state FSM tests passed."
+            }
+          ]
+        },
+        {
+          "id": "test-transcript-confidence-validation",
+          "title": "Unit script: scripts/test-transcript-confidence-validation.mjs",
+          "requirement": null,
+          "status": "passed",
+          "durationMs": 841,
+          "logs": [
+            {
+              "ts": "2026-07-22T07:29:42.615Z",
+              "level": "info",
+              "message": "    ✓ low-confidence instructions differ from silence check-in\n\nAll transcript confidence validation tests passed."
+            }
+          ]
+        },
+        {
+          "id": "test-interview-turn-latency",
+          "title": "Unit script: scripts/test-interview-turn-latency.mjs",
+          "requirement": null,
+          "status": "passed",
+          "durationMs": 839,
+          "logs": [
+            {
+              "ts": "2026-07-22T07:29:43.454Z",
+              "level": "info",
+              "message": "    ✓ conversation manager preloads next predefined question hint\n\nAll interview turn latency tests passed."
+            }
+          ]
+        },
+        {
+          "id": "test-interview-intro",
+          "title": "Unit script: scripts/test-interview-intro.mjs",
+          "requirement": null,
+          "status": "passed",
+          "durationMs": 886,
+          "logs": [
+            {
+              "ts": "2026-07-22T07:29:44.340Z",
+              "level": "info",
+              "message": "    ✓ default behavioral fallback is defined\n\nAll interview introduction tests passed."
+            }
+          ]
+        },
+        {
+          "id": "test-interview-transcript-capture",
+          "title": "Unit script: scripts/test-interview-transcript-capture.mjs",
+          "requirement": null,
+          "status": "passed",
+          "durationMs": 822,
+          "logs": [
+            {
+              "ts": "2026-07-22T07:29:45.162Z",
+              "level": "info",
+              "message": "    ✓ empty Whisper transcript does not invent text but settles the utterance\n\nAll transcript capture simulation tests passed."
+            }
+          ]
+        },
+        {
+          "id": "test-interview-room-display",
+          "title": "Unit script: scripts/test-interview-room-display.mjs",
+          "requirement": null,
+          "status": "passed",
+          "durationMs": 857,
+          "logs": [
+            {
+              "ts": "2026-07-22T07:29:46.020Z",
+              "level": "info",
+              "message": "    ✓ ending stage shows loading spinner\n\nAll interview room display tests passed."
+            }
+          ]
+        },
+        {
+          "id": "test-interview-timer",
+          "title": "Unit script: scripts/test-interview-timer.mjs",
+          "requirement": null,
+          "status": "passed",
+          "durationMs": 889,
+          "logs": [
+            {
+              "ts": "2026-07-22T07:29:46.910Z",
+              "level": "info",
+              "message": "    ✓ resume after live interruption keeps elapsed time\n\nAll interview timer tests passed."
+            }
+          ]
+        },
+        {
+          "id": "test-interview-duration",
+          "title": "Unit script: scripts/test-interview-duration.mjs",
+          "requirement": null,
+          "status": "passed",
+          "durationMs": 814,
+          "logs": [
+            {
+              "ts": "2026-07-22T07:29:47.724Z",
+              "level": "info",
+              "message": "    ✓ complete endedAt from durationSec matches allocated slot\n\nAll interview duration tests passed."
+            }
+          ]
+        },
+        {
+          "id": "qa-interview-e2e-comprehensive",
+          "title": "Comprehensive E2E suite",
+          "requirement": null,
+          "status": "passed",
+          "durationMs": 5934,
+          "logs": [
+            {
+              "ts": "2026-07-22T07:29:53.659Z",
+              "level": "info",
+              "message": "  [interview-e2e-comprehensive] PASS: Restored session still handles repeat requests correctly \n\n=== Interview E2E Comprehensive Summary ===\nPassed: 29  Failed: 0  Skipped: 1\nJSON report: C:\\uhired\\Shortlist\\docs\\qa-artifacts\\2026-07-22\\interview-e2e-comprehensive-2026-07-22T07-29-53-614Z.json\nHTML report: C:\\uhired\\Shortlist\\docs\\qa-artifacts\\2026-07-22\\interview-e2e-comprehensive-latest.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scriptsRun": [
+    "scripts/test-speech-transcription.mjs",
+    "scripts/test-voice-activity-detection.mjs",
+    "scripts/verify-semantic-evaluation.mjs",
+    "scripts/test-interview-live-phase.mjs",
+    "scripts/test-interview-silence-fallback.mjs",
+    "scripts/test-interview-conversation-state.mjs",
+    "scripts/test-transcript-confidence-validation.mjs",
+    "scripts/test-interview-turn-latency.mjs",
+    "scripts/test-interview-intro.mjs",
+    "scripts/test-interview-transcript-capture.mjs",
+    "scripts/test-interview-room-display.mjs",
+    "scripts/test-interview-timer.mjs",
+    "scripts/test-interview-duration.mjs",
+    "scripts/qa-interview-e2e-comprehensive.mjs"
+  ]
+}
