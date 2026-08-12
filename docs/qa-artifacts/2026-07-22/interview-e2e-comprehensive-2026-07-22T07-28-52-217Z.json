@@ -1,0 +1,341 @@
+{
+  "suite": "interview-e2e-comprehensive",
+  "startedAt": "2026-07-22T07:28:47.351Z",
+  "finishedAt": "2026-07-22T07:28:52.216Z",
+  "total": 30,
+  "passed": 29,
+  "failed": 0,
+  "skipped": 1,
+  "ok": true,
+  "cases": [
+    {
+      "id": "flow-01-preview-session-create",
+      "title": "Create preview practice session via API",
+      "requirement": "1. Complete interview flow",
+      "status": "passed",
+      "durationMs": 170,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:28:47.522Z",
+          "level": "info",
+          "message": "  Created preview session",
+          "meta": {
+            "sessionId": "cmrvrh00l001iv9acw2xtq3yw"
+          }
+        }
+      ]
+    },
+    {
+      "id": "flow-02-session-details-ready",
+      "title": "Load session details while READY",
+      "requirement": "1. Complete interview flow",
+      "status": "passed",
+      "durationMs": 256,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:28:47.778Z",
+          "level": "info",
+          "message": "  Session details OK",
+          "meta": {
+            "status": "READY",
+            "candidate": "E2E Test Candidate"
+          }
+        }
+      ]
+    },
+    {
+      "id": "flow-03-go-live-and-complete",
+      "title": "Transition LIVE → complete with transcript → COMPLETED scorecard",
+      "requirement": "1. Complete interview flow",
+      "status": "passed",
+      "durationMs": 897,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:28:48.077Z",
+          "level": "info",
+          "message": "  Session marked LIVE"
+        },
+        {
+          "ts": "2026-07-22T07:28:48.534Z",
+          "level": "info",
+          "message": "  Interview completed",
+          "meta": {
+            "overallScore": 47,
+            "gradingPending": true
+          }
+        },
+        {
+          "ts": "2026-07-22T07:28:48.676Z",
+          "level": "info",
+          "message": "  Final session status COMPLETED"
+        }
+      ]
+    },
+    {
+      "id": "speech-01-domain-prompt",
+      "title": "Transcription prompt includes role vocabulary",
+      "requirement": "2. Speech recognition",
+      "status": "passed",
+      "durationMs": 0,
+      "logs": []
+    },
+    {
+      "id": "speech-02-confidence-scoring",
+      "title": "Logprob confidence scoring accepts high-quality ASR",
+      "requirement": "2. Speech recognition",
+      "status": "passed",
+      "durationMs": 0,
+      "logs": []
+    },
+    {
+      "id": "speech-03-post-processing",
+      "title": "Candidate transcript post-processing normalizes spoken answers",
+      "requirement": "2. Speech recognition",
+      "status": "passed",
+      "durationMs": 1,
+      "logs": []
+    },
+    {
+      "id": "eval-01-fsm-substantive-advance",
+      "title": "Conversation FSM advances on substantive answers",
+      "requirement": "3. Evaluation pipeline",
+      "status": "passed",
+      "durationMs": 1,
+      "logs": []
+    },
+    {
+      "id": "eval-02-semantic-similarity",
+      "title": "Semantic evaluation cosine similarity ranks related answers",
+      "requirement": "3. Evaluation pipeline",
+      "status": "passed",
+      "durationMs": 1,
+      "logs": []
+    },
+    {
+      "id": "eval-03-heuristic-scorecard",
+      "title": "Heuristic scorecard produces valid scores from transcript",
+      "requirement": "3. Evaluation pipeline",
+      "status": "passed",
+      "durationMs": 0,
+      "logs": []
+    },
+    {
+      "id": "reconnect-01-fsm-serialize-restore",
+      "title": "Conversation state serializes and restores for reconnect",
+      "requirement": "4. Reconnect handling",
+      "status": "passed",
+      "durationMs": 0,
+      "logs": []
+    },
+    {
+      "id": "reconnect-02-backoff-schedule",
+      "title": "Reconnect backoff grows exponentially up to cap",
+      "requirement": "4. Reconnect handling",
+      "status": "passed",
+      "durationMs": 0,
+      "logs": []
+    },
+    {
+      "id": "reconnect-03-realtime-resume-live-session",
+      "title": "Realtime token endpoint accepts LIVE practice session resume",
+      "requirement": "4. Reconnect handling",
+      "status": "passed",
+      "durationMs": 912,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:28:49.592Z",
+          "level": "info",
+          "message": "  Realtime client secret issued for LIVE session"
+        }
+      ]
+    },
+    {
+      "id": "refresh-01-save-load-state",
+      "title": "sessionStorage snapshot saves and loads interview progress",
+      "requirement": "5. Browser refresh",
+      "status": "passed",
+      "durationMs": 0,
+      "logs": []
+    },
+    {
+      "id": "refresh-02-reject-stale-or-mismatched",
+      "title": "Expired or mismatched sessionStorage snapshots are rejected",
+      "requirement": "5. Browser refresh",
+      "status": "passed",
+      "durationMs": 0,
+      "logs": []
+    },
+    {
+      "id": "refresh-03-browser-reload-shows-reconnect",
+      "title": "Browser reload surfaces reconnect prompt for interrupted LIVE session",
+      "requirement": "5. Browser refresh",
+      "status": "skipped",
+      "durationMs": 0,
+      "reason": "QA_RUN_BROWSER not set",
+      "logs": [
+        {
+          "ts": "2026-07-22T07:28:49.592Z",
+          "level": "warn",
+          "message": "SKIP: Browser reload surfaces reconnect prompt for interrupted LIVE session",
+          "meta": {
+            "reason": "QA_RUN_BROWSER not set"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dup-01-response-create-debounce",
+      "title": "Duplicate response.create events are debounced while in-flight",
+      "requirement": "6. Duplicate prevention",
+      "status": "passed",
+      "durationMs": 1,
+      "logs": []
+    },
+    {
+      "id": "dup-02-duplicate-complete-idempotent",
+      "title": "Completing an already COMPLETED session is idempotent",
+      "requirement": "6. Duplicate prevention",
+      "status": "passed",
+      "durationMs": 846,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:28:50.439Z",
+          "level": "info",
+          "message": "  Duplicate complete returned alreadyFinalized"
+        }
+      ]
+    },
+    {
+      "id": "dup-03-preview-rate-limit",
+      "title": "Duplicate free preview for same email is rejected within 24h",
+      "requirement": "6. Duplicate prevention",
+      "status": "passed",
+      "durationMs": 231,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:28:50.670Z",
+          "level": "info",
+          "message": "  Second preview blocked",
+          "meta": {
+            "status": 429
+          }
+        }
+      ]
+    },
+    {
+      "id": "long-01-dynamic-silence-window",
+      "title": "VAD extends silence window for long thoughtful answers",
+      "requirement": "7. Long answers",
+      "status": "passed",
+      "durationMs": 0,
+      "logs": []
+    },
+    {
+      "id": "long-02-substantive-long-transcript",
+      "title": "FSM accepts very long substantive candidate answers",
+      "requirement": "7. Long answers",
+      "status": "passed",
+      "durationMs": 0,
+      "logs": []
+    },
+    {
+      "id": "silent-01-empty-transcript-check-in",
+      "title": "Empty transcript triggers silence check-in, not next question",
+      "requirement": "8. Silent users",
+      "status": "passed",
+      "durationMs": 1,
+      "logs": []
+    },
+    {
+      "id": "silent-02-fsm-empty-never-advances",
+      "title": "FSM does not advance on empty candidate speech",
+      "requirement": "8. Silent users",
+      "status": "passed",
+      "durationMs": 0,
+      "logs": []
+    },
+    {
+      "id": "noise-01-transcript-filter",
+      "title": "ASR post-processing rejects keyboard and filler noise",
+      "requirement": "9. Background noise",
+      "status": "passed",
+      "durationMs": 0,
+      "logs": []
+    },
+    {
+      "id": "noise-02-vad-classification",
+      "title": "Client VAD classifies keyboard and breathing separately from speech",
+      "requirement": "9. Background noise",
+      "status": "passed",
+      "durationMs": 0,
+      "logs": []
+    },
+    {
+      "id": "api-01-unknown-session-404",
+      "title": "Unknown session returns 404 from details endpoint",
+      "requirement": "10. API failures",
+      "status": "passed",
+      "durationMs": 81,
+      "logs": []
+    },
+    {
+      "id": "api-02-completed-realtime-409",
+      "title": "Realtime token rejected for COMPLETED session",
+      "requirement": "10. API failures",
+      "status": "passed",
+      "durationMs": 746,
+      "logs": []
+    },
+    {
+      "id": "api-03-invalid-practice-body-400",
+      "title": "Invalid practice start payload returns 400 with message",
+      "requirement": "10. API failures",
+      "status": "passed",
+      "durationMs": 9,
+      "logs": []
+    },
+    {
+      "id": "recovery-01-live-only-restore",
+      "title": "Recovery clears snapshot when server session is not LIVE",
+      "requirement": "11. Session recovery",
+      "status": "passed",
+      "durationMs": 273,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:28:51.780Z",
+          "level": "info",
+          "message": "  Stale READY snapshot cleared (expected before go-live)"
+        }
+      ]
+    },
+    {
+      "id": "recovery-02-restore-after-go-live",
+      "title": "Recovery retains snapshot when server session is LIVE",
+      "requirement": "11. Session recovery",
+      "status": "passed",
+      "durationMs": 436,
+      "logs": [
+        {
+          "ts": "2026-07-22T07:28:52.216Z",
+          "level": "info",
+          "message": "  LIVE session snapshot restored with conversation state"
+        }
+      ]
+    },
+    {
+      "id": "recovery-03-repeat-request-after-restore",
+      "title": "Restored session still handles repeat requests correctly",
+      "requirement": "11. Session recovery",
+      "status": "passed",
+      "durationMs": 0,
+      "logs": []
+    }
+  ],
+  "baseUrl": "http://localhost:3000",
+  "serverAvailable": true,
+  "browserChecksEnabled": false,
+  "environment": {
+    "node": "v22.22.0",
+    "openaiConfigured": true
+  }
+}
