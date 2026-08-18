@@ -1,152 +1,152 @@
-# Uhired — User Guide (आसान गाइड)
+# Uhired — User Guide
 
 **Platform:** [uhired.in](https://uhired.in)  
-**यह गाइड किसके लिए है:** Recruiters, candidates, company admins, aur platform operators — sabke liye simple steps.
+**Who this guide is for:** Recruiters, candidates, company admins, and platform operators who need a simple overview of how Uhired works.
 
 ---
 
 ## Quick Links
 
-| Aap kaun ho? | Kya karna hai | Link |
-|--------------|---------------|------|
-| **Company / Recruiter** | Login karo | [/company-login](https://uhired.in/company-login) |
-| **Company / Recruiter** | Naya account banao | [/company-register](https://uhired.in/company-register) |
-| **Job Candidate** | Interview join karo | Email se invite link, ya [/candidate](https://uhired.in/candidate) |
-| **Practice user** | Mock interview lo | [/practice](https://uhired.in/practice) |
+| Who are you? | What do you need? | Link |
+|--------------|-------------------|------|
+| **Company / Recruiter** | Sign in | [/company-login](https://uhired.in/company-login) |
+| **Company / Recruiter** | Create a new account | [/company-register](https://uhired.in/company-register) |
+| **Job Candidate** | Join an interview | Invite link from email, or [/candidate](https://uhired.in/candidate) |
+| **Practice User** | Start a mock interview | [/practice](https://uhired.in/practice) |
 | **Platform Admin** | Master login | [/master-login](https://uhired.in/master-login) |
-| **Koi bhi** | Homepage | [/](https://uhired.in) |
+| **Anyone** | Homepage | [/](https://uhired.in) |
 
 ---
 
-## 1. Platform par kaun-kaun use kar sakta hai? (Roles)
+## 1. Who can use the platform? (Roles)
 
-Uhired par **4 tarah ke users** hain:
+Uhired has **4 user types**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  PUBLIC USER          → Homepage, Practice (bina company login) │
+│  PUBLIC USER          → Homepage, Practice (no company login)   │
 │  COMPANY ADMIN        → Hiring, invites, scorecards           │
-│  CANDIDATE            → Interview dene wala (invite se)         │
-│  MASTER ADMIN         → Poora platform manage (Uhired team)     │
+│  CANDIDATE            → Invited interview participant          │
+│  MASTER ADMIN         → Full platform control (Uhired team)    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Role 1 — Public User (Koi bhi visitor)
+### Role 1 — Public User
 
-- **Kaun:** Koi bhi jo website visit kare
-- **Kya kar sakta hai:** Homepage dekho, About/Contact, **Practice interview** (paid mock interview)
-- **Login:** Zaroori nahi
-- **Register:** Zaroori nahi (practice ke liye sirf naam + email + payment)
+- **Who:** Anyone visiting the website
+- **What they can do:** Browse the homepage, About/Contact pages, and start a **practice interview** (paid mock interview)
+- **Login:** Not required
+- **Register:** Not required (practice only needs name + email + payment)
 
 ---
 
-### Role 2 — Company Admin / Recruiter (Hiring team)
+### Role 2 — Company Admin / Recruiter
 
-- **Kaun:** Company ka HR, recruiter, hiring manager
-- **Kya kar sakta hai:**
-  - Job / role create karna (Interview Requirement)
-  - Candidates ko email invite bhejna
-  - AI interviews ka result dekhna (scorecard, video, transcript)
-  - Dashboard, candidates list, requirements manage
+- **Who:** HR, recruiter, or hiring manager at a company
+- **What they can do:**
+  - Create a job or role (Interview Requirement)
+  - Send email invites to candidates
+  - Review AI interview results (scorecard, video, transcript)
+  - Manage the dashboard, candidates list, and requirements
 - **Login page:** `/company-login`
-- **Dashboard:** `/admin` (login ke baad)
+- **Dashboard:** `/admin` after login
 
 ---
 
-### Role 3 — Candidate (Interview dene wala)
+### Role 3 — Candidate
 
-- **Kaun:** Wo person jisko company ne interview invite bheja
-- **Kya kar sakta hai:** Invite link se interview join karna, AI se baat karna, interview complete karna
-- **Login account:** **Nahi hota** — password ki zaroorat nahi
-- **Register:** **Nahi hota** — sirf invite code + naam + email
-- **Entry page:** `/candidate?code=XXXX` (email mein link aata hai)
+- **Who:** The person invited by a company to take an interview
+- **What they can do:** Join from the invite link, speak with the AI interviewer, and complete the interview
+- **Login account:** **None** — no password required
+- **Register:** **No separate registration** — only invite code + name + email
+- **Entry page:** `/candidate?code=XXXX` from the email link
 
 ---
 
-### Role 4 — Master Admin (Platform operator)
+### Role 4 — Master Admin
 
-- **Kaun:** Uhired platform ki internal team
-- **Kya kar sakta hai:** Saari companies manage, analytics, promo codes, system settings
+- **Who:** Uhired's internal platform team
+- **What they can do:** Manage all companies, analytics, promo codes, and system settings
 - **Login page:** `/master-login`
 - **Dashboard:** `/master/dashboard`
-- **Register:** Public register **nahi** — sirf existing master credentials se login
+- **Register:** No public registration — sign in only with existing master credentials
 
 ---
 
-## 2. Register kaise karein?
+## 2. How do you register?
 
-| Role | Register ho sakta hai? | Kaise? |
-|------|------------------------|--------|
-| **Company Admin** | Haan | `/company-register` par form bharo |
-| **Candidate** | Nahi | Company aapko invite bhejegi |
-| **Practice user** | Nahi (account nahi) | `/practice` par direct start |
-| **Master Admin** | Nahi (public) | Uhired team setup karti hai |
+| Role | Can register? | How? |
+|------|---------------|------|
+| **Company Admin** | Yes | Fill out the form on `/company-register` |
+| **Candidate** | No | A company sends you an invite |
+| **Practice User** | No separate account | Start directly on `/practice` |
+| **Master Admin** | No public registration | Set up by the Uhired team |
 
 ---
 
-### Company Register (Step-by-step)
+### Company Registration (Step by step)
 
-1. Open karo: **https://uhired.in/company-register**
-2. Form bharo:
+1. Open **https://uhired.in/company-register**
+2. Fill out the form:
 
 | Field | Example | Note |
 |-------|---------|------|
-| Company Name | `Acme Corp` | Unique hona chahiye |
-| Company Domain | `acme.com` | Apni company ka domain |
-| Admin Email | `hr@acme.com` | Login ke liye use hoga |
-| Passcode | `YourSecurePass123` | Ye aapka password jaisa hai |
-| Confirm Passcode | Same as above | Dobara likho |
+| Company Name | `Acme Corp` | Must be unique |
+| Company Domain | `acme.com` | Your company domain |
+| Admin Email | `hr@acme.com` | Used for login |
+| Passcode | `YourSecurePass123` | Works like your password |
+| Confirm Passcode | Same as above | Enter it again |
 
-3. **Register** button dabao
-4. Success ke baad automatically **Admin Dashboard** (`/admin`) par chale jaoge
-5. Agli baar **Company Login** se login karna
+3. Click **Register**
+4. After success, you are automatically taken to the **Admin Dashboard** (`/admin`)
+5. Next time, sign in through **Company Login**
 
 **Important:**
-- Ek company name / domain sirf ek baar register ho sakta hai
-- Passcode bhool gaye? → `/company-login/forgot-passcode` (support contact)
+- A company name/domain can only be registered once
+- Forgot your passcode? Use `/company-login/forgot-passcode`
 
 ---
 
-### Candidate — Register nahi, Invite se aao
+### Candidate — No registration, join by invite
 
-Candidates ko **khud register nahi karna**. Flow:
+Candidates do **not** register themselves. The flow is:
 
-1. Recruiter aapko **email** bhejega
-2. Email mein **"Start interview"** link hoga
-3. Link kholo → role/company dikhega
-4. Apna **naam** aur **wahi email** likho jo invite par tha
-5. **Start My Interview** → interview room khulega
+1. The recruiter sends you an **email**
+2. The email contains a **"Start interview"** link
+3. Open the link to see the role/company
+4. Enter your **name** and the **same email** used in the invite
+5. Click **Start My Interview** to open the interview room
 
-**Agar email nahi aaya:** Recruiter se **invite code** maango, phir manually jao:  
-`https://uhired.in/candidate` aur code paste karo.
-
----
-
-### Practice User — Bina register
-
-1. Jao: **https://uhired.in/practice**
-2. Apna naam, email, role/topic choose karo
-3. Payment karo (Razorpay)
-4. Interview start ho jayega — **koi company account nahi chahiye**
+**If the email did not arrive:** Ask the recruiter for the **invite code**, then go to:  
+`https://uhired.in/candidate` and paste the code.
 
 ---
 
-## 3. Login kaise karein?
+### Practice User — No registration
 
-### A) Company Admin Login (Recruiter)
+1. Go to **https://uhired.in/practice**
+2. Enter your name, email, and choose a role/topic
+3. Complete payment through Razorpay
+4. The interview starts immediately — **no company account required**
+
+---
+
+## 3. How do you sign in?
+
+### A) Company Admin Login
 
 **URL:** `https://uhired.in/company-login`
 
-| Field | Kya likhna hai |
-|-------|----------------|
-| Company Name | Register karte waqt jo name diya tha |
+| Field | What to enter |
+|-------|---------------|
+| Company Name | The name used during registration |
 | Company Domain | e.g. `acme.com` |
 | Company Email | Admin email |
-| Passcode | Apna passcode |
+| Passcode | Your passcode |
 
 → **Continue to Admin Portal** → `/admin` dashboard
 
-**Pehli baar?** → [Register here](https://uhired.in/company-register) link use karo
+**First time?** Use [Register here](https://uhired.in/company-register)
 
 ---
 
@@ -154,59 +154,59 @@ Candidates ko **khud register nahi karna**. Flow:
 
 **URL:** `https://uhired.in/master-login`
 
-| Field | Kya likhna hai |
-|-------|----------------|
-| Admin Email | Master admin email (Uhired team se milta hai) |
+| Field | What to enter |
+|-------|---------------|
+| Admin Email | Master admin email provided by the Uhired team |
 | Passcode | Master passcode |
 
 → Dashboard: `/master/dashboard`
 
-**Note:** Ye login sirf platform operators ke liye hai. Normal companies isse login **nahi** kar sakti.
+**Note:** This login is only for platform operators. Regular companies cannot use it.
 
 ---
 
-### C) Candidate — Login nahi, Invite Code
+### C) Candidate — No login, use invite code
 
 **URL:** `https://uhired.in/candidate`  
 ya email link: `https://uhired.in/candidate?code=YOUR_CODE`
 
-| Field | Kya likhna hai |
-|-------|----------------|
-| Interview Code | Email se (auto-fill ho sakta hai) |
-| Full Name | Apna poora naam |
-| Email | **Wahi email** jis par invite aaya |
+| Field | What to enter |
+|-------|---------------|
+| Interview Code | From the email (may auto-fill) |
+| Full Name | Your full name |
+| Email | **The same email** that received the invite |
 
 → **Start My Interview**
 
-**Password nahi chahiye.**
+**No password required.**
 
 ---
 
-### D) Practice — Login nahi
+### D) Practice — No login
 
 **URL:** `https://uhired.in/practice`  
-Direct form + payment → interview start.
+Just complete the form and payment to start the interview.
 
 ---
 
-## 4. Login ke baad kya karna hai?
+## 4. What do you do after login?
 
 ### Recruiter (Company Admin) — `/admin`
 
-| Section | Kya karein |
+| Section | What to do |
 |---------|------------|
-| **Dashboard** | Overview — sessions, stats |
-| **Overview** | Naya job create karo, candidates invite bhejo |
-| **Interview Sessions** | Sab interviews dekho, video/scorecard kholo |
-| **Candidates** | Candidate-wise list |
-| **Requirements** | Pehle banaye jobs / roles |
-| **Settings** | AI interviewer voice, branding |
+| **Dashboard** | View overall interview stats and activity |
+| **Overview** | Create a new job and send candidate invites |
+| **Interview Sessions** | Review interviews, videos, and scorecards |
+| **Candidates** | View the candidate list |
+| **Requirements** | Manage previously created jobs/roles |
+| **Settings** | Update AI interviewer voice and branding |
 
 **Typical flow:**
 ```
-Login → Overview → Job details bharo → Save Requirement
-      → Candidate emails add karo → Send Invites
-      → Interview Sessions mein results dekho
+Login → Overview → Fill in job details → Save Requirement
+      → Add candidate emails → Send Invites
+      → Review results in Interview Sessions
 ```
 
 ---
@@ -214,39 +214,39 @@ Login → Overview → Job details bharo → Save Requirement
 ### Candidate — Interview flow
 
 ```
-Invite link kholo → Naam + email → Start Interview
-→ Camera/Mic allow karo → Consent accept karo
-→ AI se baat karo → End Interview → Homepage
+Open invite link → Enter name + email → Start Interview
+→ Allow camera/mic → Accept consent
+→ Speak with the AI → End interview → Return to homepage
 ```
 
 **Tips:**
-- Chrome/Edge browser use karo
-- Camera aur microphone on rakho
-- Same email use karo jo invite par tha
-- Interview ek baar complete hone ke baad dubara nahi khul sakta (same invite se)
+- Use Chrome or Edge
+- Keep camera and microphone enabled
+- Use the same email that received the invite
+- Once completed, the same invite cannot be reused
 
 ---
 
 ### Master Admin — `/master`
 
-| Page | Kya karein |
+| Page | What to do |
 |------|------------|
 | Dashboard | Platform stats |
-| Company Management | Nayi company banao, edit karo |
-| Company Interviews | Sab companies ke interviews |
-| Interview Analytics | Requirements + sessions analytics |
+| Company Management | Create and edit companies |
+| Company Interviews | View interviews across all companies |
+| Interview Analytics | Review requirement and interview analytics |
 | Promo Codes | Practice discounts |
 
 ---
 
-## 5. Kaun kahan jaaye — Simple diagram
+## 5. Who goes where? Simple diagram
 
 ```mermaid
 flowchart TD
-    A[Homepage uhired.in] --> B{Main kaun ho?}
+    A[Homepage uhired.in] --> B{Who are you?}
     B -->|Company HR / Recruiter| C[company-login]
-    B -->|Nayi company| D[company-register]
-    B -->|Interview invite mila| E[candidate?code=...]
+    B -->|New company| D[company-register]
+    B -->|Received interview invite| E[candidate?code=...]
     B -->|Practice interview| F[practice]
     B -->|Uhired team| G[master-login]
 
@@ -263,27 +263,27 @@ flowchart TD
 
 | Problem | Solution |
 |---------|----------|
-| Company login fail | Company name, domain, email, passcode check karo — sab register wale se match hona chahiye |
-| Candidate code invalid | Code expire ho sakta hai (24h) — recruiter se naya invite maango |
-| Email mismatch | Candidate email **bilkul wahi** likho jo invite par tha |
-| Invite email nahi aaya | Admin portal se invite code copy karo, manually `/candidate` par daalo |
-| Camera/mic nahi chal raha | Browser permission allow karo, Chrome use karo |
-| Interview dubara nahi khul raha | Already complete — ek invite = ek interview |
-| Forgot company passcode | `/company-login/forgot-passcode` ya support contact |
+| Company login fails | Check company name, domain, email, and passcode — they must match the registered details |
+| Candidate code is invalid | The code may have expired (24h) — ask the recruiter for a new invite |
+| Email mismatch | The candidate must enter **the exact same email** used for the invite |
+| Invite email not received | Copy the invite code from the admin portal and enter it manually on `/candidate` |
+| Camera/mic not working | Allow browser permissions and use Chrome |
+| Interview cannot be reopened | It is already completed — one invite equals one interview |
+| Forgot company passcode | Use `/company-login/forgot-passcode` or contact support |
 
 ---
 
 ## 7. Demo Credentials (Testing / Local)
 
-Agar local development ya demo environment par ho:
+If you are working in local development or a demo environment:
 
 | Role | Login URL | Credentials |
 |------|-----------|-------------|
 | Company Admin | `/company-login` | Name: `Uhired`, Domain: `uhired.com`, Email: `admin@uhired.com`, Passcode: `admin123` |
 | Master Admin | `/master-login` | `.env` file se `MASTER_ADMIN_EMAIL` / `MASTER_ADMIN_PASSWORD` |
-| Candidate | `/candidate` | Koi bhi valid invite code (admin se bhejwao) |
+| Candidate | `/candidate` | Any valid invite code |
 
-**Production par demo credentials use mat karo.**
+**Do not use demo credentials in production.**
 
 ---
 
@@ -298,11 +298,11 @@ Agar local development ya demo environment par ho:
 ## 9. One-Page Cheat Sheet
 
 ```
-RECRUITER     → company-login  → admin portal → invite candidates → dekho results
-CANDIDATE     → email link     → candidate page → interview room → done
-NEW COMPANY   → company-register → auto login → admin
+RECRUITER     → company-login    → admin portal   → invite candidates → review results
+CANDIDATE     → email link       → candidate page → interview room    → done
+NEW COMPANY   → company-register → auto login     → admin
 PRACTICE      → practice page  → pay → interview (no account)
-MASTER ADMIN  → master-login   → platform manage
+MASTER ADMIN  → master-login   → manage platform
 PUBLIC        → homepage       → no login needed
 ```
 

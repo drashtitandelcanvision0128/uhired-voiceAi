@@ -6,7 +6,7 @@ import { generateAccessCode } from "@/lib/codes";
 import { setCandidateInterviewSessionCookie } from "@/lib/candidate-interview-auth";
 import { keySkillsForDb, resolveSessionKeySkills } from "@/lib/session-key-skills";
 import { normalizeEmail } from "@/lib/parse-candidate-emails";
-import { isInviteExpired } from "@/lib/requirement-invite-expiry";
+import { getInviteAccessState } from "@/lib/requirement-invite-expiry";
 import { lookupInterviewByAccessCode } from "@/lib/interview-access-code";
 
 const schema = z.object({
@@ -23,11 +23,11 @@ export async function POST(request: Request) {
 
     const { invite, requirement } = await lookupInterviewByAccessCode(accessCode);
 
-    if (!requirement) {
+    if (!requirement || !invite) {
       return NextResponse.json(
         {
           error:
-            "We could not find that interview code. Use the exact code from your invite email, or ask the company to send a new invite.",
+            "We could not find that interview code. Use the personal link from your interview email — not the apply link.",
         },
         { status: 422 },
       );
@@ -89,14 +89,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Expiry is enforced strictly: an expired code is dead even for an unstarted attempt.
-    if (invite && isInviteExpired(invite.expiresAt)) {
-      return NextResponse.json(
-        {
-          error: "This interview code has expired. Please ask the company to send a new invite.",
-        },
-        { status: 410 },
-      );
+    if (!resumableReadyAttempt) {
+      const access = getInviteAccessState(invite);
+      if (!access.allowed) {
+        return NextResponse.json(
+          { error: access.message },
+          { status: access.reason === "expired" ? 410 : 403 },
+        );
+      }
     }
 
     const completedAttempt = await prisma.interviewSession.findFirst({

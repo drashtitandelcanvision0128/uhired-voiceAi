@@ -15,8 +15,8 @@ import {
 } from "lucide-react";
 
 import {
+  applySiteTheme,
   readStoredSiteTheme,
-  SITE_THEME_KEY,
   type SiteTheme,
 } from "@/lib/site-theme";
 
@@ -56,12 +56,7 @@ export function MasterHeaderControls({ onLogout, middleActions }: MasterHeaderCo
 
   const applyTheme = useCallback((next: MasterTheme) => {
     setTheme(next);
-    if (typeof document !== "undefined") {
-      document.documentElement.classList.toggle("dark", next === "dark");
-    }
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(SITE_THEME_KEY, next);
-    }
+    applySiteTheme(next);
   }, []);
 
   const loadHeader = useCallback(async () => {
@@ -114,17 +109,17 @@ export function MasterHeaderControls({ onLogout, middleActions }: MasterHeaderCo
   return (
     <div className="relative flex shrink-0 items-center gap-2 sm:gap-3" ref={menuRef}>
       <div
-        className="flex items-center rounded-xl border border-border bg-white p-0.5 shadow-sm dark:bg-surface/60"
+        className="flex items-center rounded-lg border border-border bg-background p-0.5"
         role="group"
         aria-label="Theme"
       >
         <button
           type="button"
           onClick={() => applyTheme("light")}
-          className={`rounded-lg p-2 transition ${
+          className={`rounded-md p-1.5 transition ${
             theme === "light"
-              ? "bg-slate-100 text-slate-800 shadow-sm dark:bg-surface dark:text-foreground"
-              : "text-slate-400 hover:text-slate-600 dark:text-muted-foreground dark:hover:text-foreground"
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:text-foreground"
           }`}
           aria-label="Light theme"
           aria-pressed={theme === "light"}
@@ -134,10 +129,10 @@ export function MasterHeaderControls({ onLogout, middleActions }: MasterHeaderCo
         <button
           type="button"
           onClick={() => applyTheme("dark")}
-          className={`rounded-lg p-2 transition ${
+          className={`rounded-md p-1.5 transition ${
             theme === "dark"
-              ? "bg-slate-100 text-slate-800 shadow-sm dark:bg-surface dark:text-foreground"
-              : "text-slate-400 hover:text-slate-600 dark:text-muted-foreground dark:hover:text-foreground"
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:text-foreground"
           }`}
           aria-label="Dark theme"
           aria-pressed={theme === "dark"}
@@ -153,7 +148,7 @@ export function MasterHeaderControls({ onLogout, middleActions }: MasterHeaderCo
             setNotificationsOpen((open) => !open);
             setProfileMenuOpen(false);
           }}
-          className="relative rounded-xl p-2.5 text-muted-foreground ring-1 ring-border transition-colors hover:bg-surface/60 hover:text-foreground"
+          className="text-muted-foreground hover:bg-muted hover:text-foreground relative rounded-lg p-2 transition-colors"
           aria-label="Notifications"
         >
           <Bell className="h-5 w-5" aria-hidden="true" />
@@ -223,7 +218,7 @@ export function MasterHeaderControls({ onLogout, middleActions }: MasterHeaderCo
             setProfileMenuOpen((open) => !open);
             setNotificationsOpen(false);
           }}
-          className="flex items-center gap-2.5 rounded-full border border-border bg-surface/60 py-1 pl-1 pr-2.5 shadow-sm backdrop-blur-sm transition hover:bg-surface hover:ring-1 hover:ring-primary/20"
+          className="hover:bg-muted flex items-center gap-2 rounded-lg border border-border bg-background py-1 pl-1 pr-2 transition"
           aria-label="Profile menu"
         >
           <div

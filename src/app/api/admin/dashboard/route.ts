@@ -161,6 +161,7 @@ export async function GET(request: Request) {
       roleSessions,
       recentSessions,
       periodNewCandidates,
+      savedOpenings,
     ] = await Promise.all([
       prisma.interviewSession.groupBy({
         by: ["status"],
@@ -200,7 +201,7 @@ export async function GET(request: Request) {
       }),
       prisma.interviewSession.count({ where: prevPeriodSessionWhere }),
       prisma.interviewSession.findMany({
-        where: periodSessionWhere,
+        where: sessionWhere,
         select: {
           positionTitle: true,
           domain: true,
@@ -219,6 +220,16 @@ export async function GET(request: Request) {
       }),
       prisma.candidate.count({
         where: { companyId, isArchived: false, createdAt: { gte: start, lte: end } },
+      }),
+      prisma.requirement.findMany({
+        where: { companyId, isArchived: false },
+        orderBy: { createdAt: "desc" },
+        take: 8,
+        select: {
+          title: true,
+          domain: true,
+          _count: { select: { sessions: true } },
+        },
       }),
     ]);
 
@@ -295,6 +306,20 @@ export async function GET(request: Request) {
       }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
+
+    const seenRoles = new Set(topRoles.map((row) => row.role.trim().toLowerCase()));
+    for (const opening of savedOpenings) {
+      if (topRoles.length >= 5) break;
+      const role = (opening.title?.trim() || opening.domain.trim() || "Untitled opening");
+      const key = role.toLowerCase();
+      if (seenRoles.has(key)) continue;
+      seenRoles.add(key);
+      topRoles.push({
+        role,
+        count: opening._count.sessions,
+        avgScore: null,
+      });
+    }
 
     const allInvitesSent = allInvites.filter((i) => i.emailSentAt).length;
     const allInvitesUsed = allInvites.filter((i) => i.usedAt).length;

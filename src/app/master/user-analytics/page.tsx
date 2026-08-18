@@ -50,6 +50,8 @@ import {
 
   MasterKpiCard,
 
+  MasterSelect,
+
   masterBtnGhost,
 
   masterInputClass,
@@ -649,9 +651,9 @@ export default function MasterUserAnalyticsPage() {
 
         <MasterInfoCard title="What is User Analytics?">
 
-          <p className="text-sm leading-relaxed text-slate-600">
+          <p className="text-sm leading-relaxed text-muted-foreground">
 
-            This page gives you a <strong className="font-semibold text-[#0f172a]">platform-wide view of people</strong>{" "}
+            This page gives you a <strong className="font-semibold text-foreground">platform-wide view of people</strong>{" "}
 
             interacting with Uhired — not company-by-company, but across the entire ecosystem. Users are grouped by
 
@@ -677,9 +679,9 @@ export default function MasterUserAnalyticsPage() {
 
                 return (
 
-                  <li key={item.title} className="flex gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+                  <li key={item.title} className="flex gap-3 rounded-xl border border-border bg-muted/70 p-3">
 
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[#0f172a]">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
 
                       <Icon className="h-4 w-4" aria-hidden="true" />
 
@@ -687,9 +689,9 @@ export default function MasterUserAnalyticsPage() {
 
                     <div>
 
-                      <p className="text-sm font-semibold text-[#0f172a]">{item.title}</p>
+                      <p className="text-sm font-semibold text-foreground">{item.title}</p>
 
-                      <p className="mt-0.5 text-xs leading-relaxed text-slate-600">{item.description}</p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
 
                     </div>
 
@@ -707,11 +709,11 @@ export default function MasterUserAnalyticsPage() {
 
           <MasterCard title="Key metrics explained">
 
-            <ul className="space-y-3 text-sm leading-relaxed text-slate-600">
+            <ul className="space-y-3 text-sm leading-relaxed text-muted-foreground">
 
               <li>
 
-                <strong className="font-semibold text-[#0f172a]">Total unique users</strong> — distinct emails across all
+                <strong className="font-semibold text-foreground">Total unique users</strong> — distinct emails across all
 
                 sources. One person can appear in multiple categories.
 
@@ -719,7 +721,7 @@ export default function MasterUserAnalyticsPage() {
 
               <li>
 
-                <strong className="font-semibold text-[#0f172a]">Active (30 days)</strong> — users with any session or
+                <strong className="font-semibold text-foreground">Active (30 days)</strong> — users with any session or
 
                 invite activity in the last month.
 
@@ -727,7 +729,7 @@ export default function MasterUserAnalyticsPage() {
 
               <li>
 
-                <strong className="font-semibold text-[#0f172a]">Returning users</strong> — people with 2 or more interview
+                <strong className="font-semibold text-foreground">Returning users</strong> — people with 2 or more interview
 
                 sessions (practice or company).
 
@@ -735,7 +737,7 @@ export default function MasterUserAnalyticsPage() {
 
               <li>
 
-                <strong className="font-semibold text-[#0f172a]">Completion rate</strong> — share of all sessions that
+                <strong className="font-semibold text-foreground">Completion rate</strong> — share of all sessions that
 
                 reached COMPLETED status.
 
@@ -743,7 +745,7 @@ export default function MasterUserAnalyticsPage() {
 
               <li>
 
-                <strong className="font-semibold text-[#0f172a]">Top tracks</strong> — most popular interview domains by
+                <strong className="font-semibold text-foreground">Top tracks</strong> — most popular interview domains by
 
                 session volume.
 
@@ -753,7 +755,7 @@ export default function MasterUserAnalyticsPage() {
 
 
 
-            <div className="mt-5 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900">
+            <div className="mt-5 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-200">
 
               <strong className="font-semibold">Note:</strong> Uhired does not have a single “user account” table yet. Analytics
 
@@ -985,11 +987,11 @@ export default function MasterUserAnalyticsPage() {
 
             {(data?.topDomains ?? []).map((track) => (
 
-              <article key={track.domain} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+              <article key={track.domain} className="rounded-xl border border-border bg-muted/70 p-4">
 
-                <p className="text-sm font-semibold text-[#0f172a]">{track.domain}</p>
+                <p className="text-sm font-semibold text-foreground">{track.domain}</p>
 
-                <p className="mt-2 text-xs text-slate-500">{track.users} users · {track.sessions} sessions</p>
+                <p className="mt-2 text-xs text-muted-foreground">{track.users} users · {track.sessions} sessions</p>
 
               </article>
 
@@ -997,7 +999,7 @@ export default function MasterUserAnalyticsPage() {
 
             {!data?.topDomains?.length ? (
 
-              <p className="text-sm text-slate-500">No session data yet.</p>
+              <p className="text-sm text-muted-foreground">No interview data yet.</p>
 
             ) : null}
 
@@ -1029,27 +1031,31 @@ export default function MasterUserAnalyticsPage() {
 
               />
 
-              <select
+              <MasterSelect
 
                 value={typeFilter}
 
-                onChange={(event) => setTypeFilter(event.target.value as "ALL" | UserType)}
+                onValueChange={(value) => setTypeFilter(value as "ALL" | UserType)}
 
-                className={masterInputClass}
+                className="min-w-[12rem]"
 
-              >
+                aria-label="Filter by user type"
 
-                <option value="ALL">All types</option>
+                options={[
 
-                <option value="PRACTICE">Practice users</option>
+                  { value: "ALL", label: "All types" },
 
-                <option value="COMPANY_CANDIDATE">Company candidates</option>
+                  { value: "PRACTICE", label: "Practice users" },
 
-                <option value="INVITED">Invited</option>
+                  { value: "COMPANY_CANDIDATE", label: "Company candidates" },
 
-                <option value="COMPANY_ADMIN">Company admins</option>
+                  { value: "INVITED", label: "Invited" },
 
-              </select>
+                  { value: "COMPANY_ADMIN", label: "Company admins" },
+
+                ]}
+
+              />
 
             </div>
 
@@ -1187,11 +1193,11 @@ export default function MasterUserAnalyticsPage() {
 
           {!loading && !(data?.pagination.total ?? 0) ? (
 
-            <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+            <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/50 px-4 py-8 text-center">
 
-              <p className="text-sm font-semibold text-slate-700">No users match your filters</p>
+              <p className="text-sm font-semibold text-foreground">No users match your filters</p>
 
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-muted-foreground">
 
                 Users appear here after someone books a practice session, gets invited by a company, or a company admin is
 
@@ -1205,7 +1211,7 @@ export default function MasterUserAnalyticsPage() {
 
 
 
-          {loading ? <p className="mt-4 text-sm text-slate-500">Loading user analytics…</p> : null}
+          {loading ? <p className="mt-4 text-sm text-muted-foreground">Loading user analytics…</p> : null}
 
         </MasterCard>
 

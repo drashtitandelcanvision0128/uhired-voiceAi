@@ -53,15 +53,15 @@ import {
 
   MasterKpiCard,
 
+  MasterSelect,
+
   masterBtnGhost,
 
   masterBtnPrimary,
 
   masterInputClass,
 
-  masterRowActionClass,
-
-  masterRowActionDangerClass,
+  MasterRowActionsMenu,
 
   masterTableHeadClass,
 
@@ -580,27 +580,31 @@ export default function MasterSupportPage() {
 
                 <span className="admin-label">Status</span>
 
-                <select
+                <MasterSelect
 
                   value={statusInput}
 
-                  onChange={(event) => setStatusInput(event.target.value as "" | InquiryStatus)}
+                  onValueChange={(value) => setStatusInput(value as "" | InquiryStatus)}
 
-                  className={`${masterInputClass} w-full`}
+                  className="w-full"
 
-                >
+                  aria-label="Filter by status"
 
-                  <option value="">All statuses</option>
+                  options={[
 
-                  <option value="NEW">New</option>
+                    { value: "", label: "All statuses" },
 
-                  <option value="READ">Read</option>
+                    { value: "NEW", label: "New" },
 
-                  <option value="REPLIED">Replied</option>
+                    { value: "READ", label: "Read" },
 
-                  <option value="ARCHIVED">Archived</option>
+                    { value: "REPLIED", label: "Replied" },
 
-                </select>
+                    { value: "ARCHIVED", label: "Archived" },
+
+                  ]}
+
+                />
 
               </label>
 
@@ -610,23 +614,27 @@ export default function MasterSupportPage() {
 
                 <span className="admin-label">Source</span>
 
-                <select
+                <MasterSelect
 
                   value={sourceInput}
 
-                  onChange={(event) => setSourceInput(event.target.value as "" | InquirySource)}
+                  onValueChange={(value) => setSourceInput(value as "" | InquirySource)}
 
-                  className={`${masterInputClass} w-full`}
+                  className="w-full"
 
-                >
+                  aria-label="Filter by source"
 
-                  <option value="">All sources</option>
+                  options={[
 
-                  <option value="PUBLIC_CONTACT">Public contact</option>
+                    { value: "", label: "All sources" },
 
-                  <option value="COMPANY_ADMIN">Company admin</option>
+                    { value: "PUBLIC_CONTACT", label: "Public contact" },
 
-                </select>
+                    { value: "COMPANY_ADMIN", label: "Company admin" },
+
+                  ]}
+
+                />
 
               </label>
 
@@ -774,7 +782,7 @@ export default function MasterSupportPage() {
 
                   <th className="pr-4">Received</th>
 
-                  <th>Action</th>
+                  <th className="w-10 text-right"> </th>
 
                 </tr>
 
@@ -841,52 +849,21 @@ export default function MasterSupportPage() {
                       {new Date(inquiry.createdAt).toLocaleString()}
                     </td>
 
-                    <td>
-
-                      <div className="flex flex-wrap gap-2">
-
-                      <button
-
-                        type="button"
-
-                        onClick={(event) => {
-
-                          event.stopPropagation();
-
-                          setSelectedId(inquiry.id);
-
-                        }}
-
-                        className={masterRowActionClass}
-
-                      >
-
-                        View
-
-                      </button>
-
-                      <button
-
-                        type="button"
-
-                        onClick={(event) => {
-
-                          event.stopPropagation();
-
-                          void deleteInquiry(inquiry.id);
-
-                        }}
-
-                        className={masterRowActionDangerClass}
-
-                      >
-
-                        Delete
-
-                      </button>
-
-                      </div>
-
+                    <td className="text-right">
+                      <MasterRowActionsMenu
+                        label={inquiry.subject}
+                        actions={[
+                          {
+                            label: "View",
+                            onClick: () => setSelectedId(inquiry.id),
+                          },
+                          {
+                            label: "Delete",
+                            onClick: () => void deleteInquiry(inquiry.id),
+                            danger: true,
+                          },
+                        ]}
+                      />
                     </td>
 
                   </tr>

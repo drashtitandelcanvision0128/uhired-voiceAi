@@ -23,7 +23,7 @@ const security = [
   { Icon: Lock, title: "Encrypted Data", copy: "Interview data encrypted in transit and at rest." },
   { Icon: KeyRound, title: "Secure Authentication", copy: "Modern session handling for every account." },
   { Icon: Users, title: "Role-Based Access", copy: "Recruiters see only what their role permits." },
-  { Icon: Layers3, title: "Tenant Isolation", copy: "Each organization's data stays logically separated." },
+  { Icon: Layers3, title: "Company Isolation", copy: "Each organization's data stays logically separated." },
   { Icon: Workflow, title: "Secure API Architecture", copy: "Scoped, validated, server-side access paths." },
   { Icon: ScrollText, title: "Audit Logging", copy: "Traceable access and administrative activity." },
   { Icon: FileLock2, title: "Protected Candidate Data", copy: "Personal data handled with strict controls." },
@@ -52,7 +52,7 @@ export function SecuritySection() {
             <div className="mx-auto grid max-w-sm place-items-center gap-4 text-center">
               <ShieldCheck className="h-16 w-16 text-cyan" aria-hidden="true" />
               <p className="text-sm text-muted-foreground">
-                Enterprise-grade encryption and tenant isolation for every interview session.
+                Enterprise-grade encryption and company-level isolation for every interview session.
               </p>
             </div>
           </div>
@@ -94,7 +94,7 @@ export function MultiTenantSection() {
                 <Building2 className="mx-auto h-5 w-5 text-primary" aria-hidden="true" />
                 <p className="mt-3 text-sm font-semibold">{org}</p>
                 <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-cyan/40 bg-cyan/10 px-2.5 py-1 font-mono text-[10px] tracking-widest text-cyan uppercase">
-                  <ShieldCheck className="h-3 w-3" aria-hidden="true" /> Secure tenant
+                  <ShieldCheck className="h-3 w-3" aria-hidden="true" /> Secure workspace
                 </p>
               </div>
             ))}

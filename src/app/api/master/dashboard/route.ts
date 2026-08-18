@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasMasterSessionFromRequest } from "@/lib/master-auth";
+import { buildStuckSessionWhere } from "@/lib/master-stuck-sessions";
 import { countSupportInquiriesByStatus } from "@/lib/support-inquiry-db";
 
 function getDaysAgoStart(days: number) {
@@ -152,20 +153,46 @@ export async function GET(request: Request) {
     });
 
     const supportNew = await countSupportInquiriesByStatus(prisma, "NEW");
+    const stuckSessions = await prisma.interviewSession.count({
+      where: buildStuckSessionWhere(),
+    });
 
     const sessionsForTrends = await prisma.interviewSession.findMany({
       where: { createdAt: { gte: fiveYearsAgo } },
-      select: { createdAt: true, sessionType: true },
+      select: { createdAt: true, sessionType: true, domain: true },
     });
 
     const weeklyTrend = buildWeeklyTrend(sessionsForTrends);
     const monthlyTrend = buildMonthlyTrend(sessionsForTrends);
     const yearlyTrend = buildYearlyTrend(sessionsForTrends);
 
-    const domainGroups = await prisma.interviewSession.groupBy({
-      by: ["domain"],
-      _count: { _all: true },
-    });
+    const monthStart = new Date();
+    monthStart.setHours(0, 0, 0, 0);
+    monthStart.setDate(1);
+    monthStart.setMonth(monthStart.getMonth() - 11);
+
+    function buildTopDomains(start: Date) {
+      const startTs = start.getTime();
+      const counts = new Map<string, number>();
+      let total = 0;
+      for (const session of sessionsForTrends) {
+        if (new Date(session.createdAt).getTime() < startTs) continue;
+        total += 1;
+        const key = session.domain?.trim() || "Unknown";
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+      return {
+        total,
+        rows: Array.from(counts.entries())
+          .map(([domain, sessions]) => ({ domain, sessions }))
+          .sort((a, b) => b.sessions - a.sessions)
+          .slice(0, 6),
+      };
+    }
+
+    const topDomainsWeekly = buildTopDomains(getDaysAgoStart(6));
+    const topDomainsMonthly = buildTopDomains(monthStart);
+    const topDomainsYearly = buildTopDomains(fiveYearsAgo);
 
     const recentSessions = await prisma.interviewSession.findMany({
       orderBy: { createdAt: "desc" },
@@ -179,6 +206,7 @@ export async function GET(request: Request) {
         domain: true,
         status: true,
         createdAt: true,
+        company: { select: { name: true } },
       },
     });
 
@@ -211,8 +239,8 @@ export async function GET(request: Request) {
       alerts.push({
         id: "live-sessions",
         level: "info",
-        title: `${liveSessions} live session${liveSessions === 1 ? "" : "s"} right now`,
-        body: "Candidates are currently in active interview rooms.",
+        title: `${liveSessions} live interview${liveSessions === 1 ? "" : "s"} right now`,
+        body: "Candidates are currently in an interview.",
         href: "/master/practice-sessions",
       });
     }
@@ -221,8 +249,8 @@ export async function GET(request: Request) {
       alerts.push({
         id: "support-new",
         level: "warning",
-        title: `${supportNew} new support inquir${supportNew === 1 ? "y" : "ies"}`,
-        body: "Unread messages from contact form or company admins need review.",
+        title: `${supportNew} new support ticket${supportNew === 1 ? "" : "s"}`,
+        body: "New messages from the contact form or company admins need a reply.",
         href: "/master/support",
       });
     }
@@ -261,23 +289,22 @@ export async function GET(request: Request) {
         promoCodesActive,
         promoRedemptions30d,
         supportNew,
+        stuckSessions,
         systemHealthPct,
       },
       weeklyTrend,
       monthlyTrend,
       yearlyTrend,
-      topDomains: domainGroups
-        .map((row) => ({
-          domain: row.domain || "Unknown",
-          sessions: row._count._all,
-        }))
-        .sort((a, b) => b.sessions - a.sessions)
-        .slice(0, 6),
+      topDomainsWeekly,
+      topDomainsMonthly,
+      topDomainsYearly,
+      topDomains: topDomainsYearly.rows,
       recentSessions: recentSessions.map((session) => ({
         id: session.id,
         type: session.sessionType,
-        name: session.candidateName ?? session.companyName ?? "Unknown",
+        name: session.candidateName ?? "Unknown",
         email: session.candidateEmail ?? "",
+        company: session.company?.name ?? session.companyName ?? "",
         domain: session.domain,
         status: session.status,
         createdAt: session.createdAt.toISOString(),

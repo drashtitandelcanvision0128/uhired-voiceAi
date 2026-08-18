@@ -116,7 +116,7 @@ const REPEAT_LANGUAGE_PATTERNS: { pattern: RegExp; language: string }[] = [
   { pattern: /\b(in|into)\s+hindi\b/i, language: "Hindi" },
   { pattern: /\bhindi\s+me(in)?\b/i, language: "Hindi" },
   { pattern: /\bhindi\s+mein\b/i, language: "Hindi" },
-  { pattern: /हिंदी/, language: "Hindi" },
+  { pattern: /\p{Script=Devanagari}+/u, language: "Hindi" },
 ];
 
 let questionIdCounter = 0;

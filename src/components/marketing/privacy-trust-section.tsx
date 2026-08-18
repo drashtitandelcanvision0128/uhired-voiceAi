@@ -51,7 +51,7 @@ export function PrivacyTrustSection() {
             Built for interviews — with your privacy in mind
           </h2>
           <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
-            Uhired uses camera and microphone during live sessions. Here is how
+            Uhired uses camera and microphone during live interviews. Here is how
             your data is handled, stored, and protected.
           </p>
         </div>

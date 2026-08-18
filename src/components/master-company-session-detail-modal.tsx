@@ -101,6 +101,7 @@ export function MasterCompanySessionDetailModal({
       onClose={onClose}
       loading={loading}
       size="xl"
+      presentation="page"
       title="Company interview detail"
       subtitle={
         session

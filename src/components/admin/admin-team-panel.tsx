@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { useAppFeedback } from "@/components/app-feedback";
+import { AppSelect } from "@/components/ui/app-select";
 
 type TeamMember = {
   id: string;
@@ -147,15 +148,16 @@ export function AdminTeamPanel() {
         </div>
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Role</label>
-          <select
+          <AppSelect
             value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
-          >
-            {ROLES.map((r) => (
-              <option key={r} value={r}>{r.replace("_", " ")}</option>
-            ))}
-          </select>
+            onValueChange={setRole}
+            className="mt-1 min-w-[11rem]"
+            aria-label="Member role"
+            options={ROLES.map((r) => ({
+              value: r,
+              label: r.replace("_", " "),
+            }))}
+          />
         </div>
         <button
           type="submit"

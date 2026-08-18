@@ -34,7 +34,13 @@ export async function GET(request: Request, context: Context) {
           scorecard: { select: { overallScore: true } },
         },
       },
-      _count: { select: { sessions: true } },
+      _count: {
+        select: {
+          sessions: {
+            where: { sessionArchivedAt: null, sessionType: "COMPANY", companyId: authCompany.companyId },
+          },
+        },
+      },
     },
   });
 

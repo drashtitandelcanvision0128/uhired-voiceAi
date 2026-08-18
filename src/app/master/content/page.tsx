@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import { useConfirm, useToast } from "@/components/app-feedback";
 import { MasterShell } from "@/components/master-shell";
-import { MasterCard, MasterAlert, masterBtnPrimary, masterInputClass } from "@/components/master-ui";
+import { MasterCard, MasterAlert, MasterRowActionsMenu, MasterSelect, masterBtnPrimary, masterInputClass } from "@/components/master-ui";
 
 type JobPage = {
   id: string;
@@ -36,6 +37,8 @@ export default function MasterCareersContentPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [pageSearch, setPageSearch] = useState("");
+  const [publishFilter, setPublishFilter] = useState<"ALL" | "published" | "draft">("ALL");
 
   const loadPages = useCallback(async () => {
     setLoading(true);
@@ -55,6 +58,16 @@ export default function MasterCareersContentPage() {
   useEffect(() => {
     void loadPages();
   }, [loadPages]);
+
+  const filteredPages = useMemo(() => {
+    const query = pageSearch.trim().toLowerCase();
+    return pages.filter((page) => {
+      if (publishFilter === "published" && !page.isPublished) return false;
+      if (publishFilter === "draft" && page.isPublished) return false;
+      if (!query) return true;
+      return `${page.title} ${page.location ?? ""} ${page.employmentType ?? ""}`.toLowerCase().includes(query);
+    });
+  }, [pages, pageSearch, publishFilter]);
 
   function startEdit(page: JobPage) {
     setEditingId(page.id);
@@ -229,14 +242,42 @@ export default function MasterCareersContentPage() {
       </MasterCard>
 
       <MasterCard className="p-6">
-        <h2 className="font-bold text-lg mb-4">Existing openings</h2>
+        <h2 className="mb-4 font-bold text-lg">Existing openings ({filteredPages.length})</h2>
+        {pages.length > 0 ? (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[12rem] flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={pageSearch}
+                onChange={(event) => setPageSearch(event.target.value)}
+                placeholder="Search title or location"
+                className={`${masterInputClass} h-8 w-full pl-8 text-sm`}
+                aria-label="Search job openings"
+              />
+            </div>
+            <MasterSelect
+              value={publishFilter}
+              onValueChange={(value) => setPublishFilter(value as typeof publishFilter)}
+              size="sm"
+              className="min-w-[9.5rem]"
+              aria-label="Filter by publish status"
+              options={[
+                { value: "ALL", label: "All openings" },
+                { value: "published", label: "Published" },
+                { value: "draft", label: "Drafts" },
+              ]}
+            />
+          </div>
+        ) : null}
         {loading ? (
           <p className="text-sm text-slate-500">Loading…</p>
         ) : pages.length === 0 ? (
           <p className="text-sm text-slate-500">No job openings yet.</p>
+        ) : filteredPages.length === 0 ? (
+          <p className="text-sm text-slate-500">No openings match these filters.</p>
         ) : (
           <ul className="space-y-4">
-            {pages.map((page) => (
+            {filteredPages.map((page) => (
               <li key={page.id} className="rounded-lg border border-slate-200 p-4">
                 {editingId === page.id ? (
                   <div className="space-y-3">
@@ -307,28 +348,22 @@ export default function MasterCareersContentPage() {
                         {page.location ? ` · ${page.location}` : ""}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-slate-700"
-                        onClick={() => startEdit(page)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-slate-700"
-                        onClick={() => void togglePublish(page)}
-                      >
-                        {page.isPublished ? "Unpublish" : "Publish"}
-                      </button>
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-red-600"
-                        onClick={() => void deletePage(page.id)}
-                      >
-                        Delete
-                      </button>
+                    <div className="flex items-start justify-end">
+                      <MasterRowActionsMenu
+                        label={page.title}
+                        actions={[
+                          { label: "Edit", onClick: () => startEdit(page) },
+                          {
+                            label: page.isPublished ? "Unpublish" : "Publish",
+                            onClick: () => void togglePublish(page),
+                          },
+                          {
+                            label: "Delete",
+                            onClick: () => void deletePage(page.id),
+                            danger: true,
+                          },
+                        ]}
+                      />
                     </div>
                   </div>
                 )}

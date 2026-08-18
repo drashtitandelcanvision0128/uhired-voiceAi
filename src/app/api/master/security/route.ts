@@ -13,14 +13,20 @@ export async function GET(request: Request) {
     const page = Math.max(1, Number(url.searchParams.get("page") ?? "1") || 1);
     const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get("pageSize") ?? "10") || 10));
     const filter = url.searchParams.get("filter")?.trim().toLowerCase();
+    const search = url.searchParams.get("search")?.trim() ?? "";
+    const trust = url.searchParams.get("trust")?.trim().toLowerCase();
 
     const successFilter =
       filter === "success" ? true : filter === "failed" ? false : undefined;
+    const trustDevice =
+      trust === "yes" ? true : trust === "no" ? false : undefined;
 
     const { rows, total } = await listMasterLoginEvents(prisma, {
       page,
       pageSize,
       success: successFilter,
+      search,
+      trustDevice,
     });
 
     const [allEvents, successEvents, failedEvents] = await Promise.all([

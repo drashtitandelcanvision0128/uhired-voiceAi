@@ -5,8 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Activity,
   AlertTriangle,
-  ArrowRight,
   Clock,
+  Eye,
   RefreshCw,
   Search,
   Trash2,
@@ -25,10 +25,12 @@ import {
   MasterInlineKpi,
   MasterKpiCard,
   MasterStatusBadge,
+  MasterSelect,
   masterBtnGhost,
   masterBtnPrimary,
   masterInputClass,
   masterRowActionDangerClass,
+  MasterRowActionsMenu,
 } from "@/components/master-ui";
 
 type StuckSession = {
@@ -70,6 +72,25 @@ function formatAgeLabel(ageHours: number) {
 
 function sessionTypeLabel(type: string) {
   return type === "COMPANY" ? "Company" : "Practice";
+}
+
+function formatInterviewTopic(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\banaytics\b/gi, "analytics")
+    .split(" ")
+    .map((word) => {
+      const core = word.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, "");
+      if (!core) return word;
+      const lower = core.toLowerCase();
+      const formatted =
+        lower === "hr" || lower === "qa" || lower === "it" || lower === "ai"
+          ? lower.toUpperCase()
+          : lower.charAt(0).toUpperCase() + lower.slice(1);
+      return word.replace(core, formatted);
+    })
+    .join(" ");
 }
 
 export function MasterStuckSessionsPanel({
@@ -401,7 +422,7 @@ export function MasterStuckSessionsPanel({
                     ) : null}
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       <span className="font-semibold text-foreground/80">{sessionTypeLabel(session.type)}</span>
-                      <span>{session.domain}</span>
+                      <span>{formatInterviewTopic(session.domain)}</span>
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3" aria-hidden />
                         {formatAgeLabel(session.ageHours)} old
@@ -410,31 +431,28 @@ export function MasterStuckSessionsPanel({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={rowBusy}
-                    onClick={() => void updateSession(session.id, "complete")}
-                    className={`${masterBtnPrimary} !px-3 !py-1.5 !text-xs disabled:opacity-50`}
-                  >
-                    Force complete
-                  </button>
-                  <button
-                    type="button"
-                    disabled={rowBusy}
-                    onClick={() => void updateSession(session.id, "reset_to_ready")}
-                    className={`${masterBtnGhost} !px-3 !py-1.5 !text-xs disabled:opacity-50`}
-                  >
-                    Reset to ready
-                  </button>
-                  <button
-                    type="button"
-                    disabled={rowBusy || bulkDeleteBusy}
-                    onClick={() => void deleteSession(session.id)}
-                    className={`${masterRowActionDangerClass} disabled:opacity-50`}
-                  >
-                    Delete
-                  </button>
+                <div className="flex justify-end">
+                  <MasterRowActionsMenu
+                    label={session.name}
+                    actions={[
+                      {
+                        label: "Force complete",
+                        onClick: () => void updateSession(session.id, "complete"),
+                        disabled: rowBusy,
+                      },
+                      {
+                        label: "Reset to ready",
+                        onClick: () => void updateSession(session.id, "reset_to_ready"),
+                        disabled: rowBusy,
+                      },
+                      {
+                        label: "Delete",
+                        onClick: () => void deleteSession(session.id),
+                        danger: true,
+                        disabled: rowBusy || bulkDeleteBusy,
+                      },
+                    ]}
+                  />
                 </div>
               </div>
             </article>
@@ -446,11 +464,11 @@ export function MasterStuckSessionsPanel({
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-success/12 text-success ring-1 ring-success/25">
               <Activity className="h-6 w-6" aria-hidden />
             </div>
-            <p className="mt-4 text-base font-bold text-foreground">No stuck sessions found</p>
+            <p className="mt-4 text-base font-bold text-foreground">No stuck interviews found</p>
             <p className="mt-1 text-sm text-muted-foreground">
               {hasActiveFilters
-                ? "Try adjusting your filters or clear them to see all stuck sessions."
-                : "All sessions are progressing normally — nothing needs attention right now."}
+                ? "Try changing your filters, or clear them to see all stuck interviews."
+                : "All interviews are moving normally — nothing needs attention right now."}
             </p>
             {hasActiveFilters ? (
               <button
@@ -471,7 +489,7 @@ export function MasterStuckSessionsPanel({
           page={page}
           pageSize={pageSize}
           totalItems={data?.pagination.total ?? data?.stuckCount ?? 0}
-          itemLabel="stuck sessions"
+          itemLabel="stuck interviews"
           onPageChange={setPage}
           onPageSizeChange={(size) => {
             setPageSize(size);
@@ -483,44 +501,109 @@ export function MasterStuckSessionsPanel({
   );
 
   if (compact) {
+    const preview = (data?.sessions ?? []).slice(0, 6);
     return (
-      <MasterCard
-        className="border-warning/30 bg-warning/5"
-        title="Stuck sessions"
-        subtitle={`${data?.liveCount ?? 0} live · ${data?.stuckCount ?? 0} older than 1 hour`}
-        headerAction={
-          <div className="flex flex-wrap items-center gap-2">
+      <section className="admin-card border-warning/30 bg-warning/5 p-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="admin-section-title text-sm">Stuck interviews</p>
+            <p className="text-[11px] text-muted-foreground">
+              {data?.liveCount ?? 0} live · {data?.stuckCount ?? 0} older than 1 hour
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5">
             {showViewAllLink ? (
               <Link
                 href="/master/stuck-sessions"
-                className={`${masterBtnGhost} inline-flex items-center gap-1 !px-3 !py-1.5 !text-xs`}
+                className={`${masterBtnGhost} inline-flex items-center gap-1 !px-2.5 !py-1 !text-xs`}
               >
-                View all <ArrowRight className="h-3 w-3" />
+                <Eye className="h-3.5 w-3.5" />
+                View all
               </Link>
             ) : null}
             <button
               type="button"
               onClick={() => void load()}
               disabled={loading}
-              className={`${masterBtnGhost} inline-flex items-center gap-2 !px-3 !py-1.5 !text-xs disabled:opacity-60`}
+              className={`${masterBtnGhost} inline-flex items-center gap-1.5 !px-2.5 !py-1 !text-xs disabled:opacity-60`}
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
               Refresh
             </button>
           </div>
-        }
-      >
-        {error ? <MasterAlert variant="error" className="mb-4">{error}</MasterAlert> : null}
+        </div>
+        {error ? <MasterAlert variant="error" className="mb-2">{error}</MasterAlert> : null}
         {loading && !data?.sessions.length ? (
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             {[1, 2, 3].map((n) => (
-              <div key={n} className="h-20 animate-pulse rounded-2xl bg-surface/60" />
+              <div key={n} className="h-10 animate-pulse rounded-lg bg-surface/60" />
             ))}
           </div>
+        ) : preview.length ? (
+          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+            {preview.map((session) => {
+              const rowBusy = updatingId === session.id || deleteLoadingId === session.id;
+              const isCritical = session.ageHours >= 24;
+              return (
+                <article
+                  key={session.id}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 ${
+                    isCritical ? "bg-warning/10" : "bg-surface/40"
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="truncate text-sm font-semibold text-foreground">{session.name}</p>
+                      <MasterStatusBadge status={session.status} />
+                      {isCritical ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-warning ring-1 ring-warning/25">
+                          <AlertTriangle className="h-3 w-3" aria-hidden />
+                          Critical
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {[
+                        session.email,
+                        sessionTypeLabel(session.type),
+                        formatInterviewTopic(session.domain),
+                        `${formatAgeLabel(session.ageHours)} old`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                  <MasterRowActionsMenu
+                    label={session.name}
+                    actions={[
+                      {
+                        label: "Force complete",
+                        onClick: () => void updateSession(session.id, "complete"),
+                        disabled: rowBusy,
+                      },
+                      {
+                        label: "Reset to ready",
+                        onClick: () => void updateSession(session.id, "reset_to_ready"),
+                        disabled: rowBusy,
+                      },
+                      {
+                        label: "Delete",
+                        onClick: () => void deleteSession(session.id),
+                        danger: true,
+                        disabled: rowBusy || bulkDeleteBusy,
+                      },
+                    ]}
+                  />
+                </article>
+              );
+            })}
+          </div>
         ) : (
-          sessionList
+          <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-sm text-muted-foreground">
+            No stuck interviews — everything is moving normally.
+          </p>
         )}
-      </MasterCard>
+      </section>
     );
   }
 
@@ -529,15 +612,15 @@ export function MasterStuckSessionsPanel({
       {error ? <MasterAlert variant="error">{error}</MasterAlert> : null}
 
       <MasterHero
-        badge="Session recovery"
-        title="Stuck session monitoring"
-        subtitle="Sessions stuck in LIVE or READY for more than 1 hour — review, force-complete, or clean up safely."
+        badge="Needs attention"
+        title="Stuck interviews"
+        subtitle="These interviews started or are waiting, but have not finished for more than 1 hour. You can review, complete, or remove them."
         actions={
           <button
             type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/15 disabled:opacity-60"
+            className="admin-btn-ghost inline-flex items-center gap-2 px-4 py-2.5 text-sm disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -556,14 +639,14 @@ export function MasterStuckSessionsPanel({
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MasterKpiCard
-          label="Live Sessions"
+          label="Live Interviews"
           value={data?.liveCount ?? 0}
           hint="Across the platform right now"
           icon={Activity}
           accent="bg-destructive/12 text-destructive ring-destructive/25"
         />
         <MasterKpiCard
-          label="Stuck Sessions"
+          label="Stuck Interviews"
           value={data?.stuckCount ?? 0}
           hint="LIVE or READY older than 1 hour"
           icon={AlertTriangle}
@@ -587,11 +670,11 @@ export function MasterStuckSessionsPanel({
 
       <MasterCard
         elevated
-        title="Stuck sessions"
-        subtitle="Filter by candidate, status, type, domain, age, or date range."
+        title="Stuck interviews"
+        subtitle="Filter by candidate, status, interview type, company, age, or date range."
       >
         <div className="mb-5 rounded-xl border border-border bg-surface/40 p-4 sm:p-5">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:items-end">
             <label className="block space-y-1.5">
               <span className="admin-label">Search sessions</span>
               <div className="relative">
@@ -613,39 +696,39 @@ export function MasterStuckSessionsPanel({
 
             <label className="block space-y-1.5">
               <span className="admin-label">Status</span>
-              <select
+              <MasterSelect
                 value={statusInput}
-                onChange={(event) =>
-                  setStatusInput(event.target.value as "" | "LIVE" | "READY")
-                }
-                className={`${masterInputClass} w-full`}
-              >
-                <option value="">All stuck statuses</option>
-                <option value="LIVE">LIVE</option>
-                <option value="READY">READY</option>
-              </select>
+                onValueChange={(value) => setStatusInput(value as "" | "LIVE" | "READY")}
+                className="w-full"
+                aria-label="Filter by stuck status"
+                options={[
+                  { value: "", label: "All stuck statuses" },
+                  { value: "LIVE", label: "LIVE" },
+                  { value: "READY", label: "READY" },
+                ]}
+              />
             </label>
 
             <label className="block space-y-1.5">
               <span className="admin-label">Session type</span>
-              <select
+              <MasterSelect
                 value={typeInput}
-                onChange={(event) =>
-                  setTypeInput(event.target.value as "" | "PRACTICE" | "COMPANY")
-                }
-                className={`${masterInputClass} w-full`}
-              >
-                <option value="">All types</option>
-                <option value="PRACTICE">Practice</option>
-                <option value="COMPANY">Company</option>
-              </select>
+                onValueChange={(value) => setTypeInput(value as "" | "PRACTICE" | "COMPANY")}
+                className="w-full"
+                aria-label="Filter by session type"
+                options={[
+                  { value: "", label: "All types" },
+                  { value: "PRACTICE", label: "Practice" },
+                  { value: "COMPANY", label: "Company" },
+                ]}
+              />
             </label>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-end gap-2">
               <button
                 type="button"
                 onClick={applyFilters}
-                className={`${masterBtnPrimary} inline-flex items-center gap-2 !px-5`}
+                className={`${masterBtnPrimary} inline-flex h-[2.75rem] flex-1 items-center justify-center gap-2 !px-4`}
               >
                 <Search className="h-4 w-4" aria-hidden />
                 Search
@@ -654,16 +737,14 @@ export function MasterStuckSessionsPanel({
                 <button
                   type="button"
                   onClick={clearFilters}
-                  className={`${masterBtnGhost} inline-flex items-center gap-2 !px-4`}
+                  className={`${masterBtnGhost} inline-flex h-[2.75rem] items-center justify-center gap-2 !px-4`}
                 >
                   <X className="h-4 w-4" aria-hidden />
                   Clear
                 </button>
               ) : null}
             </div>
-          </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <label className="block space-y-1.5">
               <span className="admin-label">Domain / track</span>
               <input
@@ -696,7 +777,7 @@ export function MasterStuckSessionsPanel({
               />
             </label>
             <div className="grid grid-cols-2 gap-3">
-              <label className="block space-y-1.5">
+              <label className="block min-w-0 space-y-1.5">
                 <span className="admin-label">From date</span>
                 <input
                   type="date"
@@ -705,7 +786,7 @@ export function MasterStuckSessionsPanel({
                   className={`${masterInputClass} w-full`}
                 />
               </label>
-              <label className="block space-y-1.5">
+              <label className="block min-w-0 space-y-1.5">
                 <span className="admin-label">To date</span>
                 <input
                   type="date"

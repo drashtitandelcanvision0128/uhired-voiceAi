@@ -32,7 +32,7 @@ const schema = z.object({
 });
 
 const DEFAULT_PAGE_SIZE = 10;
-const MAX_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 200;
 
 function parsePositiveInt(value: string | null, fallback: number): number {
   const parsed = Number.parseInt(value ?? "", 10);
@@ -159,9 +159,13 @@ export async function GET(request: Request) {
           },
           orderBy: { createdAt: "desc" },
           select: {
+            id: true,
             requirementId: true,
             email: true,
+            candidateName: true,
+            source: true,
             accessCode: true,
+            scheduledAt: true,
             emailSentAt: true,
             usedAt: true,
             expiresAt: true,
@@ -169,6 +173,24 @@ export async function GET(request: Request) {
         })
       : Promise.resolve([]),
   ]);
+
+  const inviteEmails = [...new Set(requirementInvites.map((invite) => invite.email))];
+  const candidateNames =
+    inviteEmails.length > 0
+      ? await prisma.candidate.findMany({
+          where: {
+            companyId: authCompany.companyId,
+            email: { in: inviteEmails },
+            isArchived: false,
+          },
+          select: { email: true, name: true },
+        })
+      : [];
+  const candidateNameByEmail = new Map(
+    candidateNames.flatMap((row) =>
+      row.email ? [[row.email.toLowerCase(), row.name] as const] : [],
+    ),
+  );
 
   const interviewsByRequirement = new Map<string, typeof linkedSessions>();
   for (const row of linkedSessions) {
@@ -198,8 +220,13 @@ export async function GET(request: Request) {
     sessionsCount: r._count.sessions,
     requirementAccessCode: r.accessCode ?? null,
     candidateInvites: (invitesByRequirement.get(r.id) ?? []).map((invite) => ({
+      id: invite.id,
       email: invite.email,
+      candidateName:
+        invite.candidateName ?? candidateNameByEmail.get(invite.email.toLowerCase()) ?? null,
+      source: invite.source,
       accessCode: invite.accessCode,
+      scheduledAt: invite.scheduledAt?.toISOString() ?? null,
       emailSentAt: invite.emailSentAt?.toISOString() ?? null,
       usedAt: invite.usedAt?.toISOString() ?? null,
       expiresAt: invite.expiresAt?.toISOString() ?? null,

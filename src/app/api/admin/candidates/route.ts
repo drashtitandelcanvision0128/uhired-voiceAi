@@ -17,13 +17,18 @@ const postSchema = z.object({
 });
 
 const DEFAULT_PAGE_SIZE = 10;
-const MAX_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 200;
 const MAX_CANDIDATES = 500;
 
 function parsePositiveInt(value: string | null, fallback: number): number {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
+
+const COMPANY_SESSION_WHERE = {
+  sessionArchivedAt: null,
+  sessionType: "COMPANY" as const,
+};
 
 type CandidateRow = Prisma.CandidateGetPayload<{
   include: {
@@ -41,7 +46,7 @@ function serializeCandidate(c: CandidateRow) {
     key: c.id,
     candidateName: c.name,
     candidateEmail: revealEmail(c.email),
-    latestStatus: latest?.status ?? "READY",
+    latestStatus: latest?.status ?? (c._count.sessions > 0 ? "READY" : "NONE"),
     latestScore: latest?.scorecard?.overallScore ?? null,
     latestSessionId: latest?.id ?? null,
     sessionsCount: c._count.sessions,
@@ -82,12 +87,16 @@ export async function GET(request: Request) {
     orderBy: { updatedAt: "desc" },
     include: {
       sessions: {
-        where: { sessionArchivedAt: null },
+        where: { ...COMPANY_SESSION_WHERE, companyId: authCompany.companyId },
         orderBy: { createdAt: "desc" },
         take: 1,
         include: { scorecard: true },
       },
-      _count: { select: { sessions: true } },
+      _count: {
+        select: {
+          sessions: { where: { ...COMPANY_SESSION_WHERE, companyId: authCompany.companyId } },
+        },
+      },
     },
     take: MAX_CANDIDATES,
   });
@@ -101,8 +110,11 @@ export async function GET(request: Request) {
   const completedCount = completedList.length;
   const readyCount = readyList.length;
   const totalSessions = allSerialized.reduce((sum, c) => sum + c.sessionsCount, 0);
+  const candidatesWithInterviews = allSerialized.filter((c) => c.sessionsCount > 0).length;
   const avgSessionsPerCandidate =
-    allSerialized.length > 0 ? Math.round((totalSessions / allSerialized.length) * 10) / 10 : 0;
+    candidatesWithInterviews > 0
+      ? Math.round((totalSessions / candidatesWithInterviews) * 10) / 10
+      : 0;
 
   const statusFiltered =
     status === "COMPLETED"
@@ -130,6 +142,7 @@ export async function GET(request: Request) {
       completedInterview: completedCount,
       readyNotStarted: readyCount,
       avgSessionsPerCandidate,
+      totalSessions,
     },
   });
 }

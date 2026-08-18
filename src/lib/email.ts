@@ -5,6 +5,7 @@ import type Mail from "nodemailer/lib/mailer";
 import { env } from "@/lib/env";
 import {
   INVITE_EXPIRY_EMAIL_NOTE,
+  INVITE_SCHEDULED_ACCESS_NOTE,
   INVITE_SINGLE_USE_NOTE,
   formatInviteExpiryForEmail,
 } from "@/lib/requirement-invite-expiry";
@@ -22,6 +23,8 @@ type InterviewInviteEmailInput = {
   accessCode: string;
   interviewUrl: string;
   expiresAt: Date;
+  scheduledAt?: Date;
+  candidateName?: string;
 };
 
 export type InviteEmailSendResult = {
@@ -183,34 +186,66 @@ type InviteEmailContent = {
 
 function buildInviteEmailContent(input: InterviewInviteEmailInput): InviteEmailContent {
   const expiryLabel = formatInviteExpiryForEmail(input.expiresAt);
+  const scheduledLabel = input.scheduledAt ? formatInviteExpiryForEmail(input.scheduledAt) : "";
   const replyTo = getReplyToAddress();
   const companyName = input.companyName.trim();
   const roleTitle = input.roleTitle.trim();
+  const greetingName = input.candidateName?.trim();
+  const helloLine = greetingName ? `Hello ${greetingName},` : "Hello,";
+  const isScheduled = Boolean(input.scheduledAt);
 
-  const subject = `${companyName} — interview for ${roleTitle}`;
-  const preheader = `Your interview code is ${input.accessCode}. Complete your interview before ${expiryLabel} (IST).`;
+  const subject = isScheduled
+    ? `${companyName} — interview scheduled for ${roleTitle}`
+    : `${companyName} — interview for ${roleTitle}`;
+  const preheader = isScheduled
+    ? `Your interview is at ${scheduledLabel} (IST). The link opens 10 minutes before.`
+    : `Your interview code is ${input.accessCode}. Complete your interview before ${expiryLabel} (IST).`;
 
-  const textLines = [
-    `Hello,`,
-    ``,
-    `${companyName} has invited you to complete an interview for the ${roleTitle} role on ${COMPANY_NAME}.`,
-    ``,
-    `Your interview code: ${input.accessCode}`,
-    `Open your interview: ${input.interviewUrl}`,
-    ``,
-    `${INVITE_EXPIRY_EMAIL_NOTE}`,
-    `Expires on: ${expiryLabel} (IST)`,
-    `${INVITE_SINGLE_USE_NOTE}`,
-    ``,
-    `Sign in with this email address: ${input.to}`,
-    ...(replyTo ? [``, `Questions? Contact us at ${replyTo}.`] : []),
-    ``,
-    `— ${COMPANY_NAME}`,
-    COMPANY_WEBSITE,
-    ``,
-    `You received this email because ${companyName} invited you to an interview on ${COMPANY_NAME}.`,
-    `This is a transactional message about your interview — not a marketing email.`,
-  ];
+  const textLines = isScheduled
+    ? [
+        helloLine,
+        ``,
+        `${companyName} scheduled your interview for the ${roleTitle} role on ${COMPANY_NAME}.`,
+        ``,
+        `Interview time: ${scheduledLabel} (IST)`,
+        INVITE_SCHEDULED_ACCESS_NOTE,
+        ``,
+        `Your interview code: ${input.accessCode}`,
+        `Open your interview: ${input.interviewUrl}`,
+        ``,
+        `Window closes: ${expiryLabel} (IST)`,
+        INVITE_SINGLE_USE_NOTE,
+        ``,
+        `Sign in with this email address: ${input.to}`,
+        ...(replyTo ? [``, `Questions? Contact us at ${replyTo}.`] : []),
+        ``,
+        `— ${COMPANY_NAME}`,
+        COMPANY_WEBSITE,
+        ``,
+        `You received this email because ${companyName} scheduled your interview on ${COMPANY_NAME}.`,
+        `This is a transactional message about your interview — not a marketing email.`,
+      ]
+    : [
+        helloLine,
+        ``,
+        `${companyName} has invited you to complete an interview for the ${roleTitle} role on ${COMPANY_NAME}.`,
+        ``,
+        `Your interview code: ${input.accessCode}`,
+        `Open your interview: ${input.interviewUrl}`,
+        ``,
+        `${INVITE_EXPIRY_EMAIL_NOTE}`,
+        `Expires on: ${expiryLabel} (IST)`,
+        `${INVITE_SINGLE_USE_NOTE}`,
+        ``,
+        `Sign in with this email address: ${input.to}`,
+        ...(replyTo ? [``, `Questions? Contact us at ${replyTo}.`] : []),
+        ``,
+        `— ${COMPANY_NAME}`,
+        COMPANY_WEBSITE,
+        ``,
+        `You received this email because ${companyName} invited you to an interview on ${COMPANY_NAME}.`,
+        `This is a transactional message about your interview — not a marketing email.`,
+      ];
 
   const text = textLines.join("\n");
 
@@ -220,7 +255,27 @@ function buildInviteEmailContent(input: InterviewInviteEmailInput): InviteEmailC
   const safeUrl = escapeHtml(input.interviewUrl);
   const safeEmail = escapeHtml(input.to);
   const safeExpiry = escapeHtml(expiryLabel);
+  const safeScheduled = escapeHtml(scheduledLabel);
   const safeReplyTo = replyTo ? escapeHtml(replyTo) : "";
+  const safeHello = escapeHtml(helloLine);
+  const heading = isScheduled ? `Interview scheduled for ${safeRole}` : `Interview for ${safeRole}`;
+  const intro = isScheduled
+    ? `<strong>${safeCompany}</strong> scheduled your interview for the <strong>${safeRole}</strong> role on ${COMPANY_NAME}.`
+    : `<strong>${safeCompany}</strong> invited you to complete an interview for the <strong>${safeRole}</strong> role on ${COMPANY_NAME}.`;
+  const scheduleBox = isScheduled
+    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px;background-color:#ecfdf5;border:1px solid #99f6e4;border-radius:8px;">
+                <tr>
+                  <td style="padding:14px 16px;">
+                    <p style="margin:0 0 4px;font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#0f766e;">Interview time (IST)</p>
+                    <p style="margin:0 0 8px;font-size:18px;font-weight:700;color:#0f172a;">${safeScheduled}</p>
+                    <p style="margin:0;font-size:13px;color:#475569;">${escapeHtml(INVITE_SCHEDULED_ACCESS_NOTE)}</p>
+                  </td>
+                </tr>
+              </table>`
+    : "";
+  const expiryCopy = isScheduled
+    ? `<strong>Window closes:</strong> ${safeExpiry} (IST). ${escapeHtml(INVITE_SINGLE_USE_NOTE)}`
+    : `<strong>Expires:</strong> ${safeExpiry} (IST). ${escapeHtml(INVITE_EXPIRY_EMAIL_NOTE)} ${escapeHtml(INVITE_SINGLE_USE_NOTE)}`;
 
   const html = `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
@@ -239,9 +294,10 @@ function buildInviteEmailContent(input: InterviewInviteEmailInput): InviteEmailC
           <tr>
             <td style="padding:28px 28px 8px;">
               <p style="margin:0 0 4px;font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#006a62;">${COMPANY_NAME}</p>
-              <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;line-height:1.3;color:#0f172a;">Interview for ${safeRole}</h1>
-              <p style="margin:0 0 16px;">Hello,</p>
-              <p style="margin:0 0 16px;"><strong>${safeCompany}</strong> invited you to complete an interview for the <strong>${safeRole}</strong> role on ${COMPANY_NAME}.</p>
+              <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;line-height:1.3;color:#0f172a;">${heading}</h1>
+              <p style="margin:0 0 16px;">${safeHello}</p>
+              <p style="margin:0 0 16px;">${intro}</p>
+              ${scheduleBox}
               <p style="margin:0 0 8px;font-size:13px;color:#64748b;">Your interview code</p>
               <p style="margin:0 0 20px;font-size:24px;font-weight:700;letter-spacing:2px;color:#006a62;font-family:Consolas,Monaco,monospace;">${safeCode}</p>
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;">
@@ -251,7 +307,7 @@ function buildInviteEmailContent(input: InterviewInviteEmailInput): InviteEmailC
                   </td>
                 </tr>
               </table>
-              <p style="margin:0 0 12px;font-size:14px;color:#475569;"><strong>Expires:</strong> ${safeExpiry} (IST). ${escapeHtml(INVITE_EXPIRY_EMAIL_NOTE)} ${escapeHtml(INVITE_SINGLE_USE_NOTE)}</p>
+              <p style="margin:0 0 12px;font-size:14px;color:#475569;">${expiryCopy}</p>
               <p style="margin:0 0 12px;font-size:14px;color:#475569;">Sign in with: <strong>${safeEmail}</strong></p>
               ${replyTo ? `<p style="margin:0 0 12px;font-size:14px;color:#475569;">Questions? Contact <a href="mailto:${safeReplyTo}" style="color:#006a62;">${safeReplyTo}</a>.</p>` : ""}
             </td>

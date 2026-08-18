@@ -1,5 +1,7 @@
 "use client";
 
+import { MasterSelect } from "@/components/master-ui";
+
 export const MASTER_PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 
 export type MasterPageSize = (typeof MASTER_PAGE_SIZE_OPTIONS)[number];
@@ -39,17 +41,17 @@ export function MasterPagination({
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-slate-600">
           Rows
-          <select
-            value={pageSize}
-            onChange={(event) => onPageSizeChange(Number(event.target.value) as MasterPageSize)}
-            className="admin-input !w-auto !py-1.5 !px-2 !text-sm"
-          >
-            {MASTER_PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
+          <MasterSelect
+            value={String(pageSize)}
+            onValueChange={(value) => onPageSizeChange(Number(value) as MasterPageSize)}
+            size="sm"
+            className="!w-[4.75rem] min-w-[4.75rem]"
+            aria-label="Rows per page"
+            options={MASTER_PAGE_SIZE_OPTIONS.map((size) => ({
+              value: String(size),
+              label: String(size),
+            }))}
+          />
         </label>
         <div className="flex items-center gap-2">
           <button

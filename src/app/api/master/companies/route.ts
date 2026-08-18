@@ -5,12 +5,23 @@ import { hashCompanyPasscode } from "@/lib/company-passcode";
 import { prisma } from "@/lib/prisma";
 import { hasMasterSessionFromRequest } from "@/lib/master-auth";
 
+function stripWhitespace(value: string) {
+  return value.replace(/\s+/g, "");
+}
+
 const upsertCompanySchema = z.object({
   companyId: z.string().trim().optional(),
   companyName: z.string().trim().min(1),
   domain: z.string().trim().min(1),
-  adminEmail: z.string().trim().email(),
-  adminPasscode: z.string().trim().min(1).optional(),
+  adminEmail: z
+    .string()
+    .transform((value) => stripWhitespace(value).toLowerCase())
+    .pipe(z.string().email()),
+  adminPasscode: z.preprocess((value) => {
+    if (typeof value !== "string") return value;
+    const compact = stripWhitespace(value);
+    return compact === "" ? undefined : compact;
+  }, z.string().min(1).optional()),
   interviewerName: z.string().trim().max(80).optional(),
   interviewerVoiceGender: z.enum(["MALE", "FEMALE"]).optional(),
   isActive: z.boolean().optional(),
@@ -50,16 +61,23 @@ export async function GET(request: Request) {
   const page = Math.max(1, Number(url.searchParams.get("page") ?? "1") || 1);
   const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get("pageSize") ?? "10") || 10));
   const search = url.searchParams.get("search")?.trim() ?? "";
+  const isActiveParam = url.searchParams.get("isActive")?.trim().toLowerCase();
+  const planParam = url.searchParams.get("plan")?.trim().toUpperCase();
 
-  const where = search
-    ? {
-        OR: [
-          { name: { contains: search, mode: "insensitive" as const } },
-          { domain: { contains: search, mode: "insensitive" as const } },
-          { adminEmail: { contains: search, mode: "insensitive" as const } },
-        ],
-      }
-    : {};
+  const where: {
+    OR?: Array<Record<string, { contains: string; mode: "insensitive" }>>;
+    isActive?: boolean;
+  } = {};
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { domain: { contains: search, mode: "insensitive" } },
+      { adminEmail: { contains: search, mode: "insensitive" } },
+    ];
+  }
+  if (isActiveParam === "true" || isActiveParam === "false") {
+    where.isActive = isActiveParam === "true";
+  }
 
   const companies = await prisma.company.findMany({
     where,
@@ -70,12 +88,9 @@ export async function GET(request: Request) {
       },
     },
     orderBy: { createdAt: "desc" },
-    skip: (page - 1) * pageSize,
-    take: pageSize,
   });
-  const total = await prisma.company.count({ where });
 
-  const rows = companies
+  const mapped = companies
     .map((company) => ({
       id: company.id,
       companyName: company.name,
@@ -94,14 +109,21 @@ export async function GET(request: Request) {
         ) ?? company.updatedAt,
       plan: company.sessions.length >= 10 ? "ENTERPRISE" : "STANDARD",
     }))
+    .filter((row) => {
+      if (planParam === "ENTERPRISE" || planParam === "STANDARD") return row.plan === planParam;
+      return true;
+    })
     .sort((a, b) => b.totalSessions - a.totalSessions);
+
+  const total = mapped.length;
+  const rows = mapped.slice((page - 1) * pageSize, page * pageSize);
 
   return NextResponse.json({
     metrics: {
       totalCompanies: total,
-      activeEnterprise: rows.filter((c) => c.plan === "ENTERPRISE").length,
-      totalAiSessions: rows.reduce((sum, c) => sum + c.totalSessions, 0),
-      systemHealthPct: 99.9,
+      activeEnterprise: mapped.filter((c) => c.plan === "ENTERPRISE" && c.isActive).length,
+      totalAiSessions: mapped.reduce((sum, c) => sum + c.totalSessions, 0),
+      inactiveCompanies: mapped.filter((c) => !c.isActive).length,
     },
     companies: rows,
     pagination: {

@@ -8,7 +8,6 @@ import {
   Video,
   Users,
   FileText,
-  BarChart3,
   PlusCircle,
   HelpCircle,
   Settings,
@@ -17,17 +16,14 @@ import {
   Zap,
   Link2,
   Bot,
-  MoreVertical,
   Upload,
   Mail,
   FileSpreadsheet,
   FileDown,
-  Download,
   Search,
   CheckCircle2,
   Trash2,
   Clock,
-  Layers,
   ChevronDown,
   LogOut,
   Moon,
@@ -56,7 +52,9 @@ import {
   Lock,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { DASHBOARD_AUTO_REFRESH_MS, readStoredSiteTheme, SITE_THEME_KEY } from "@/lib/site-theme";
+import { usePathname, useRouter } from "next/navigation";
+import { applySiteTheme, readStoredSiteTheme } from "@/lib/site-theme";
+import { adminNavHref, adminPathForSection, parseAdminPath } from "@/lib/admin-portal-routes";
 import { INTERVIEW_LANGUAGES } from "@/lib/interview-languages";
 import {
   HOLISTIC_OVERALL_FORMULA,
@@ -77,8 +75,12 @@ import {
   AdminRequirementDetailModal,
   type AdminRequirementDetail,
 } from "@/components/admin-requirement-detail-modal";
-import { AdminPortalLogo } from "@/components/admin-portal-logo";
 import { AdminDashboard, type DashboardData, type DashboardPeriod } from "@/components/admin-dashboard";
+import { AdminCandidatesTable } from "@/components/admin-candidates-table";
+import { AdminRequirementsTable } from "@/components/admin-requirements-table";
+import { AdminSessionsTable } from "@/components/admin-sessions-table";
+import { AppShell } from "@/components/dashboard/app-shell";
+import { AppSelect } from "@/components/ui/app-select";
 import {
   EXCEL_EMAIL_LIMIT,
   MANUAL_EMAIL_LIMIT,
@@ -149,6 +151,7 @@ type CandidateView = {
   latestScore: number | null;
   latestSessionId: string | null;
   sessionsCount: number;
+  updatedAt?: string;
 };
 
 type CandidateDetail = AdminCandidateDetail;
@@ -167,18 +170,6 @@ function formatSessionKeySkills(keySkills: unknown): string {
 function parseKeySkillsArray(keySkills: unknown): string[] {
   if (!Array.isArray(keySkills)) return [];
   return keySkills.map((s) => String(s).trim()).filter(Boolean);
-}
-
-function formatRequirementRelativeDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  const diffMs = Date.now() - d.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays <= 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  return formatDateShort(iso);
 }
 
 function sessionMandatoryPrompts(session: SessionDetail): string {
@@ -211,13 +202,25 @@ function getInviteStatus(invite: { usedAt: string | null; emailSentAt: string | 
 function inviteStatusStyles(status: InviteStatus): { chip: string; dot: string } {
   switch (status) {
     case "Used":
-      return { chip: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70", dot: "bg-emerald-500" };
+      return {
+        chip: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/30",
+        dot: "bg-emerald-500",
+      };
     case "Sent":
-      return { chip: "bg-sky-50 text-sky-700 ring-1 ring-sky-200/70", dot: "bg-sky-500" };
+      return {
+        chip: "bg-sky-50 text-sky-700 ring-1 ring-sky-200/70 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-400/30",
+        dot: "bg-sky-500",
+      };
     case "Expired":
-      return { chip: "bg-amber-50 text-amber-800 ring-1 ring-amber-200/70", dot: "bg-amber-500" };
+      return {
+        chip: "bg-amber-50 text-amber-800 ring-1 ring-amber-200/70 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/30",
+        dot: "bg-amber-500",
+      };
     default:
-      return { chip: "bg-slate-100 text-slate-600 ring-1 ring-slate-200/80", dot: "bg-slate-400" };
+      return {
+        chip: "bg-slate-100 text-slate-600 ring-1 ring-slate-200/80 dark:bg-white/10 dark:text-slate-300 dark:ring-white/15",
+        dot: "bg-slate-400",
+      };
   }
 }
 
@@ -249,20 +252,6 @@ function formatRelativeTime(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function getCandidateInitials(name: string | null, email?: string | null) {
-  const source = (name?.trim() || email?.trim() || "").trim();
-  if (!source) return "?";
-  const parts = source.split(/\s+/);
-  if (parts.length >= 2) return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-  return source.slice(0, 2).toUpperCase();
-}
-
-function sessionMatchStyles(score: number) {
-  if (score >= 70) return { bar: "bg-emerald-500", text: "text-emerald-600" };
-  if (score >= 40) return { bar: "bg-amber-500", text: "text-amber-600" };
-  return { bar: "bg-rose-500", text: "text-rose-600" };
-}
-
 const SESSION_QUICK_VIEWS = [
   { key: "all", label: "All Sessions" },
   { key: "completed", label: "Completed only" },
@@ -273,12 +262,12 @@ const SESSION_QUICK_VIEWS = [
 type SessionQuickViewKey = (typeof SESSION_QUICK_VIEWS)[number]["key"];
 
 const ROLE_AVATAR_COLORS = [
-  "bg-emerald-100 text-emerald-700",
-  "bg-blue-100 text-blue-700",
-  "bg-amber-100 text-amber-700",
-  "bg-violet-100 text-violet-700",
-  "bg-rose-100 text-rose-700",
-  "bg-cyan-100 text-cyan-700",
+  "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300",
+  "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300",
+  "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
+  "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300",
+  "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300",
+  "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300",
 ];
 
 function getRoleInitials(title: string | null, domain: string) {
@@ -297,24 +286,16 @@ function roleAvatarColor(title: string | null, domain: string) {
 }
 
 function sessionStatusBadgeClass(status: string) {
-  if (status === "COMPLETED") return "bg-emerald-100 text-emerald-800";
-  if (status === "READY") return "bg-amber-100 text-amber-800";
-  if (status === "LIVE") return "bg-cyan-100 text-cyan-800";
-  return "bg-slate-100 text-slate-700";
-}
-
-function candidateAvatarColor(name: string | null) {
-  const key = (name ?? "?").toLowerCase();
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) hash = key.charCodeAt(i) + ((hash << 5) - hash);
-  return ROLE_AVATAR_COLORS[Math.abs(hash) % ROLE_AVATAR_COLORS.length];
-}
-
-function candidateStatusBadgeClass(status: string) {
-  if (status === "COMPLETED") return "bg-emerald-100 text-emerald-800";
-  if (status === "READY") return "bg-amber-100 text-amber-800";
-  if (status === "LIVE") return "bg-cyan-100 text-cyan-800";
-  return "bg-slate-100 text-slate-700";
+  if (status === "COMPLETED") {
+    return "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300";
+  }
+  if (status === "READY") {
+    return "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300";
+  }
+  if (status === "LIVE") {
+    return "bg-cyan-100 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-300";
+  }
+  return "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300";
 }
 
 function formatDateTime(iso: string) {
@@ -326,26 +307,25 @@ function formatDateTime(iso: string) {
 
 const workspaceNavItems = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { key: "overview", label: "Overview", icon: Compass },
-  { key: "sessions", label: "Interview Sessions", icon: Video },
+  { key: "overview", label: "Invites", icon: Compass },
   { key: "candidates", label: "Candidates", icon: Users },
-  { key: "requirements", label: "Requirements", icon: FileText },
+  { key: "requirements", label: "Job Openings", icon: FileText },
+  { key: "sessions", label: "All Interviews", icon: Video },
 ];
 
 const systemNavItems = [
-  { key: "settings", label: "AI Interviewer", icon: Bot },
-  { key: "analytics", label: "Analytics", icon: BarChart3 },
+  { key: "settings", label: "Interviewer Voice", icon: Bot },
   { key: "app-settings", label: "Settings", icon: Settings },
   { key: "support", label: "Support", icon: HelpCircle },
 ];
 
 const sectionTitles: Record<string, string> = {
   dashboard: "Dashboard",
-  overview: "Overview",
-  sessions: "Interview Sessions",
+  overview: "Invites",
+  sessions: "All Interviews",
   candidates: "Candidates",
-  requirements: "Requirements",
-  settings: "AI Interviewer",
+  requirements: "Job Openings",
+  settings: "Interviewer Voice",
   profile: "Profile",
   "app-settings": "Settings",
   support: "Support",
@@ -424,10 +404,14 @@ function formatTenantSince(iso: string): string {
 }
 
 export default function AdminPageClient() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { section: activeSection, openingTab } = parseAdminPath(pathname);
   const { confirmDelete, confirmAction, notify } = useAppFeedback();
   const formRef = useRef<HTMLFormElement>(null);
   const draftSectionRef = useRef<HTMLElement>(null);
   const invitePanelRef = useRef<HTMLDivElement>(null);
+  const roleFieldRef = useRef<HTMLDivElement>(null);
   const [sessions, setSessions] = useState<SessionView[]>([]);
   const [error, setError] = useState("");
   const [inviteMode, setInviteMode] = useState<"excel" | "manual">("excel");
@@ -457,7 +441,7 @@ export default function AdminPageClient() {
   const [generateQuestionsBusy, setGenerateQuestionsBusy] = useState(false);
   const [maxOptionalQuestions, setMaxOptionalQuestions] = useState(2);
   const [selectedRequirementId, setSelectedRequirementId] = useState<string | null>(null);
-  const [previousRequirementsExpanded, setPreviousRequirementsExpanded] = useState(false);
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const [overviewRequirements, setOverviewRequirements] = useState<RequirementView[]>([]);
   const [loadingOverviewRequirements, setLoadingOverviewRequirements] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -500,6 +484,8 @@ export default function AdminPageClient() {
   });
   const [supportSending, setSupportSending] = useState(false);
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
+  const [supportTicketSearch, setSupportTicketSearch] = useState("");
+  const [supportTicketStatus, setSupportTicketStatus] = useState<"ALL" | SupportTicket["status"]>("ALL");
   const [loadingSupportTickets, setLoadingSupportTickets] = useState(false);
   const [supportFaqOpen, setSupportFaqOpen] = useState<string | null>("invite-email");
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() => new Set());
@@ -517,25 +503,23 @@ export default function AdminPageClient() {
   });
   const [savingBrandSettings, setSavingBrandSettings] = useState(false);
   const [savingInterviewerSettings, setSavingInterviewerSettings] = useState(false);
-  const [activeSection, setActiveSection] = useState("dashboard");
   const [draftScrollToken, setDraftScrollToken] = useState(0);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("30d");
   const [candidates, setCandidates] = useState<CandidateView[]>([]);
   const [candidatePage, setCandidatePage] = useState(1);
-  const [candidatesTotal, setCandidatesTotal] = useState(0);
-  const [candidatesTotalPages, setCandidatesTotalPages] = useState(1);
-  const [candidateStatusFilter, setCandidateStatusFilter] = useState<"ALL" | "COMPLETED" | "READY">("ALL");
   const [candidateMetrics, setCandidateMetrics] = useState({
     total: 0,
     completedInterview: 0,
     readyNotStarted: 0,
     avgSessionsPerCandidate: 0,
+    totalSessions: 0,
   });
   const [requirements, setRequirements] = useState<RequirementView[]>([]);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [loadingRequirements, setLoadingRequirements] = useState(false);
+  const [loadingSessions, setLoadingSessions] = useState(false);
   const [sessionSearch, setSessionSearch] = useState("");
   const [candidateSearch, setCandidateSearch] = useState("");
   const [requirementSearch, setRequirementSearch] = useState("");
@@ -551,7 +535,6 @@ export default function AdminPageClient() {
   const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
   const [savedSessionViews, setSavedSessionViews] = useState<SavedSessionView[]>([]);
   const [saveViewName, setSaveViewName] = useState("");
-  const [manualRefreshBusy, setManualRefreshBusy] = useState(false);
   const [sessionPage, setSessionPage] = useState(1);
   const [sessionsTotal, setSessionsTotal] = useState(0);
   const [sessionsTotalPages, setSessionsTotalPages] = useState(1);
@@ -570,13 +553,11 @@ export default function AdminPageClient() {
     completed: 0,
     open: 0,
   });
-  const [recentSessions, setRecentSessions] = useState<SessionView[]>([]);
   const SESSION_PAGE_SIZE = 10;
-  const CANDIDATE_PAGE_SIZE = 10;
   const REQUIREMENT_PAGE_SIZE = 10;
-  const PREVIOUS_REQUIREMENTS_PREVIEW = 4;
   const [successMessage, setSuccessMessage] = useState("");
   const [requirementViewer, setRequirementViewer] = useState<RequirementView | null>(null);
+  const [scheduleBusyEmail, setScheduleBusyEmail] = useState<string | null>(null);
   const [editor, setEditor] = useState<{
     kind: "session" | "candidate" | "requirement";
     recordId: string;
@@ -642,6 +623,7 @@ export default function AdminPageClient() {
   }, [dashboardPeriod]);
 
   const refreshSessions = useCallback(async (): Promise<string | null> => {
+    setLoadingSessions(true);
     const params = new URLSearchParams({
       page: String(sessionPage),
       pageSize: String(SESSION_PAGE_SIZE),
@@ -651,13 +633,11 @@ export default function AdminPageClient() {
       maxScore: sessionScoreMax.trim(),
       from: sessionFrom.trim(),
       to: sessionTo.trim(),
-      recentLimit: "6",
     });
     try {
       const listRes = await fetch(`/api/admin/sessions?${params}`, { cache: "no-store" });
       const data = (await listRes.json().catch(() => ({}))) as {
         sessions?: SessionView[];
-        recentSessions?: SessionView[];
         pagination?: { total: number; totalPages: number };
         statusCounts?: typeof sessionStatusCounts;
         error?: string;
@@ -669,10 +649,11 @@ export default function AdminPageClient() {
       setSessionsTotal(data.pagination?.total ?? 0);
       setSessionsTotalPages(data.pagination?.totalPages ?? 1);
       if (data.statusCounts) setSessionStatusCounts(data.statusCounts);
-      setRecentSessions(data.recentSessions ?? []);
       return null;
     } catch {
       return "Unable to load sessions.";
+    } finally {
+      setLoadingSessions(false);
     }
   }, [
     sessionPage,
@@ -700,12 +681,7 @@ export default function AdminPageClient() {
 
   const applyTheme = useCallback((next: AdminTheme) => {
     setTheme(next);
-    if (typeof document !== "undefined") {
-      document.documentElement.classList.toggle("dark", next === "dark");
-    }
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(SITE_THEME_KEY, next);
-    }
+    applySiteTheme(next);
   }, []);
 
   const refreshInterviewerSettings = useCallback(async (): Promise<string | null> => {
@@ -1038,33 +1014,6 @@ export default function AdminPageClient() {
     }
   }
 
-  async function manualRefreshAllData() {
-    setManualRefreshBusy(true);
-    setError("");
-    setSuccessMessage("");
-    try {
-      const results = await Promise.all([
-        refreshSessions(),
-        refreshDashboard(dashboardPeriod),
-        refreshCandidates(),
-        refreshRequirements(),
-        refreshAuthCompany(),
-      ]);
-      const firstError = results.find((message): message is string => Boolean(message));
-      if (firstError) {
-        setError(firstError);
-        return;
-      }
-      setSuccessMessage("Data refreshed.");
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Unable to refresh data right now.";
-      setError(message);
-    } finally {
-      setManualRefreshBusy(false);
-    }
-  }
-
   async function saveInterviewerSettings() {
     setSavingInterviewerSettings(true);
     setError("");
@@ -1164,10 +1113,10 @@ export default function AdminPageClient() {
     setLoadingCandidates(true);
     try {
       const params = new URLSearchParams({
-        page: String(candidatePage),
-        pageSize: String(CANDIDATE_PAGE_SIZE),
+        page: "1",
+        pageSize: "200",
         search: candidateSearch.trim(),
-        status: candidateStatusFilter,
+        status: "ALL",
       });
       const response = await fetch(`/api/admin/candidates?${params}`, { cache: "no-store" });
       const data = (await response.json()) as {
@@ -1178,6 +1127,7 @@ export default function AdminPageClient() {
           completedInterview: number;
           readyNotStarted: number;
           avgSessionsPerCandidate: number;
+          totalSessions?: number;
         };
         error?: string;
       };
@@ -1185,22 +1135,28 @@ export default function AdminPageClient() {
         return data.error ?? "Unable to load candidates.";
       }
       setCandidates(data.candidates ?? []);
-      setCandidatesTotal(data.pagination?.total ?? 0);
-      setCandidatesTotalPages(data.pagination?.totalPages ?? 1);
-      if (data.metrics) setCandidateMetrics(data.metrics);
+      if (data.metrics) {
+        setCandidateMetrics({
+          total: data.metrics.total,
+          completedInterview: data.metrics.completedInterview,
+          readyNotStarted: data.metrics.readyNotStarted,
+          avgSessionsPerCandidate: data.metrics.avgSessionsPerCandidate,
+          totalSessions: data.metrics.totalSessions ?? 0,
+        });
+      }
       return null;
     } catch {
       return "Unable to load candidates.";
     } finally {
       setLoadingCandidates(false);
     }
-  }, [candidatePage, candidateSearch, candidateStatusFilter]);
+  }, [candidateSearch]);
 
   const refreshRequirements = useCallback(async (): Promise<string | null> => {
     setLoadingRequirements(true);
     const params = new URLSearchParams({
-      page: String(requirementPage),
-      pageSize: String(REQUIREMENT_PAGE_SIZE),
+      page: "1",
+      pageSize: "200",
       search: requirementSearch.trim(),
     });
     try {
@@ -1212,7 +1168,7 @@ export default function AdminPageClient() {
         error?: string;
       };
       if (!response.ok) {
-        return data.error ?? "Unable to load requirements.";
+        return data.error ?? "Unable to load openings.";
       }
       setRequirements(data.requirements ?? []);
       setRequirementsTotal(data.pagination?.total ?? 0);
@@ -1222,11 +1178,11 @@ export default function AdminPageClient() {
       );
       return null;
     } catch {
-      return "Unable to load requirements.";
+      return "Unable to load openings.";
     } finally {
       setLoadingRequirements(false);
     }
-  }, [requirementPage, requirementSearch]);
+  }, [requirementSearch]);
 
   const refreshOverviewRequirements = useCallback(async (): Promise<string | null> => {
     setLoadingOverviewRequirements(true);
@@ -1238,12 +1194,12 @@ export default function AdminPageClient() {
         error?: string;
       };
       if (!response.ok) {
-        return data.error ?? "Unable to load previous requirements.";
+        return data.error ?? "Unable to load previous openings.";
       }
       setOverviewRequirements(data.requirements ?? []);
       return null;
     } catch {
-      return "Unable to load previous requirements.";
+      return "Unable to load previous openings.";
     } finally {
       setLoadingOverviewRequirements(false);
     }
@@ -1260,11 +1216,9 @@ export default function AdminPageClient() {
     setMaxOptionalQuestions(requirement.maxOptionalQuestions);
     setQuestionsOpen(requirement.mandatoryQuestions.length > 0);
     setOptionalQuestionsOpen(requirement.optionalQuestions.length > 0);
+    setRoleMenuOpen(false);
     setError("");
     setSuccessMessage(`Loaded "${requirement.title ?? requirement.domain}" — add emails and send invites.`);
-    window.requestAnimationFrame(() => {
-      invitePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
   }
 
   function clearSelectedRequirement() {
@@ -1310,6 +1264,16 @@ export default function AdminPageClient() {
     return () => window.clearTimeout(timer);
   }, [targetRole]);
 
+  useEffect(() => {
+    function closeRoleMenu(event: MouseEvent) {
+      if (!roleFieldRef.current?.contains(event.target as Node)) {
+        setRoleMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", closeRoleMenu);
+    return () => document.removeEventListener("mousedown", closeRoleMenu);
+  }, []);
+
   const roleSkillSuggestions = suggestKeySkillsForTargetRole(debouncedTargetRole);
   const pendingSuggestedSkills = roleSkillSuggestions.skills.filter((skill) => !skills.includes(skill));
   const verificationByEmail = useMemo(
@@ -1318,6 +1282,15 @@ export default function AdminPageClient() {
   );
   const verifiedEmailCount = emailVerifications.filter((row) => row.valid).length;
   const invalidEmailCount = emailVerifications.filter((row) => !row.valid).length;
+
+  const filteredSupportTickets = useMemo(() => {
+    const query = supportTicketSearch.trim().toLowerCase();
+    return supportTickets.filter((ticket) => {
+      if (supportTicketStatus !== "ALL" && ticket.status !== supportTicketStatus) return false;
+      if (!query) return true;
+      return `${ticket.subject} ${ticket.message}`.toLowerCase().includes(query);
+    });
+  }, [supportTickets, supportTicketSearch, supportTicketStatus]);
 
   useEffect(() => {
     if (!parsedEmails.length) {
@@ -1696,14 +1669,14 @@ export default function AdminPageClient() {
     setSavingRequirement(false);
 
     if (!response.ok) {
-      setError(data.error ?? "Unable to save interview requirement.");
+      setError(data.error ?? "Unable to save opening.");
       return;
     }
 
     setSuccessMessage(
       data.accessCode
-        ? `Interview requirement saved. You can invite candidates anytime from Requirements or send invites below.`
-        : "Interview requirement saved.",
+        ? `Opening saved. You can invite candidates anytime from Job Openings or send invites below.`
+        : "Opening saved.",
     );
     await refreshRequirements();
     await refreshDashboard();
@@ -1715,13 +1688,54 @@ export default function AdminPageClient() {
   }
 
   function scrollToDraft() {
-    setActiveSection("overview");
+    closeAllViewers();
+    try {
+      sessionStorage.setItem("uhired-admin-focus-draft", "1");
+    } catch {
+      // ignore
+    }
+    if (pathname !== "/admin/invite") {
+      router.push("/admin/invite");
+      return;
+    }
     setDraftScrollToken((token) => token + 1);
   }
 
+  function closeAllViewers() {
+    setDetailSession(null);
+    setDetailLoading(false);
+    setCandidateViewer(null);
+    setCandidateViewerLoading(false);
+    setRequirementViewer(null);
+    setEditor(null);
+    setSessionEditDetail(null);
+    setSessionEditLoading(false);
+  }
+
+  function setActiveSection(section: string) {
+    closeAllViewers();
+    const path = adminPathForSection(section, section === "requirements" ? "openings" : openingTab);
+    if (pathname !== path) router.push(path);
+  }
+
+  function setOpeningTab(tab: "openings" | "sessions") {
+    const path = adminPathForSection("requirements", tab);
+    if (pathname !== path) router.push(path);
+  }
+
+  function goToOpening(tab: "openings" | "sessions" = "openings") {
+    closeAllViewers();
+    setOpeningTab(tab);
+  }
+
   function navigateToSection(section: string) {
+    closeAllViewers();
     if (section === "overview") {
       scrollToDraft();
+      return;
+    }
+    if (section === "sessions") {
+      setOpeningTab("sessions");
       return;
     }
     setActiveSection(section);
@@ -1738,6 +1752,92 @@ export default function AdminPageClient() {
   async function copyCode(value: string, successText: string) {
     await navigator.clipboard.writeText(value);
     setSuccessMessage(successText);
+  }
+
+  async function copyOpeningShareLink(requirement: RequirementView) {
+    const response = await fetch(`/api/admin/requirements/${requirement.requirementId}/share-link`, {
+      method: "POST",
+    });
+    const data = (await response.json()) as { shareUrl?: string; accessCode?: string; error?: string };
+    if (!response.ok || !data.shareUrl) {
+      setError(data.error ?? "Unable to create share link.");
+      return;
+    }
+    if (data.accessCode) {
+      setRequirements((current) =>
+        current.map((item) =>
+          item.requirementId === requirement.requirementId
+            ? { ...item, requirementAccessCode: data.accessCode ?? item.requirementAccessCode }
+            : item,
+        ),
+      );
+      setRequirementViewer((current) =>
+        current && current.requirementId === requirement.requirementId
+          ? { ...current, requirementAccessCode: data.accessCode ?? current.requirementAccessCode }
+          : current,
+      );
+    }
+    await copyCode(data.shareUrl, "Share link copied. Send it to any candidate.");
+  }
+
+  async function scheduleOpeningInvite(input: {
+    requirementId: string;
+    email: string;
+    scheduledAt: string;
+  }) {
+    setError("");
+    setScheduleBusyEmail(input.email);
+    try {
+      const scheduledAt = new Date(input.scheduledAt);
+      if (Number.isNaN(scheduledAt.getTime())) {
+        setError("Choose a valid interview date and time.");
+        return;
+      }
+      const response = await fetch("/api/admin/requirements/schedule-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requirementId: input.requirementId,
+          email: input.email,
+          scheduledAt: scheduledAt.toISOString(),
+        }),
+      });
+      const data = (await response.json()) as {
+        ok?: boolean;
+        emailed?: boolean;
+        emailError?: string | null;
+        invite?: RequirementView["candidateInvites"][number];
+        error?: string;
+      };
+      if (!response.ok || !data.ok || !data.invite) {
+        setError(data.error ?? "Unable to schedule this interview.");
+        return;
+      }
+      const updatedInvite = data.invite;
+      const patchInvites = (invites: RequirementView["candidateInvites"]) =>
+        invites.map((invite) => (invite.email === updatedInvite.email ? { ...invite, ...updatedInvite } : invite));
+      setRequirements((current) =>
+        current.map((item) =>
+          item.requirementId === input.requirementId
+            ? { ...item, candidateInvites: patchInvites(item.candidateInvites ?? []) }
+            : item,
+        ),
+      );
+      setRequirementViewer((current) =>
+        current && current.requirementId === input.requirementId
+          ? { ...current, candidateInvites: patchInvites(current.candidateInvites ?? []) }
+          : current,
+      );
+      if (data.emailed) {
+        setSuccessMessage(`Interview email sent to ${input.email} with the scheduled time.`);
+      } else {
+        setError(data.emailError ?? "Schedule saved, but the email was not sent.");
+      }
+    } catch {
+      setError("Unable to schedule this interview.");
+    } finally {
+      setScheduleBusyEmail(null);
+    }
   }
 
   async function runAnswerGrading(sessionId: string) {
@@ -1763,6 +1863,11 @@ export default function AdminPageClient() {
   }
 
   async function openSessionEditor(sessionId: string) {
+    setDetailSession(null);
+    setDetailLoading(false);
+    setCandidateViewer(null);
+    setCandidateViewerLoading(false);
+    setRequirementViewer(null);
     setEditor({ kind: "session", recordId: sessionId });
     setSessionEditLoading(true);
     setSessionEditDetail(null);
@@ -1785,6 +1890,8 @@ export default function AdminPageClient() {
   }
 
   async function openCandidateViewer(candidateId: string) {
+    setDetailSession(null);
+    setRequirementViewer(null);
     setCandidateViewerLoading(true);
     setCandidateViewer(null);
     setError("");
@@ -1804,6 +1911,9 @@ export default function AdminPageClient() {
   }
 
   async function openSessionDetail(sessionId: string) {
+    setCandidateViewer(null);
+    setCandidateViewerLoading(false);
+    setRequirementViewer(null);
     setDetailLoading(true);
     setDetailSession(null);
     setLastCreatedShare(null);
@@ -1962,11 +2072,11 @@ export default function AdminPageClient() {
     });
     const data = (await response.json()) as { error?: string };
     if (!response.ok) {
-      setError(data.error ?? "Unable to save requirements.");
+      setError(data.error ?? "Unable to save opening.");
       return;
     }
     closeEditor();
-    setSuccessMessage("Requirements updated.");
+    setSuccessMessage("Opening updated.");
     await refreshRequirements();
   }
 
@@ -2027,10 +2137,10 @@ export default function AdminPageClient() {
 
   async function deleteRequirement(sessionId: string) {
     const shouldDelete = await confirmAction({
-      title: "Delete requirement?",
+      title: "Delete opening?",
       message:
-        "This removes the requirement from active use. Existing submitted interview data will be preserved in Interview Sessions.",
-      confirmLabel: "Delete requirement",
+        "This removes the opening from active use. Existing submitted interview data will be preserved in Interview Sessions.",
+      confirmLabel: "Delete opening",
       variant: "danger",
     });
     if (!shouldDelete) {
@@ -2042,10 +2152,10 @@ export default function AdminPageClient() {
     });
     const data = (await response.json()) as { error?: string };
     if (!response.ok) {
-      setError(data.error ?? "Unable to delete requirement.");
+      setError(data.error ?? "Unable to delete opening.");
       return;
     }
-    setSuccessMessage("Requirement deleted from active list.");
+    setSuccessMessage("Opening deleted from active list.");
     await Promise.all([refreshRequirements(), refreshSessions()]);
   }
 
@@ -2094,7 +2204,7 @@ export default function AdminPageClient() {
       items.push({
         id: "live",
         title: "Live interviews",
-        body: `${sessionStatusCounts.live} session${sessionStatusCounts.live === 1 ? "" : "s"} currently live.`,
+                        body: `${sessionStatusCounts.live} interview${sessionStatusCounts.live === 1 ? "" : "s"} currently live.`,
         time: "Now",
         section: "sessions",
       });
@@ -2102,8 +2212,8 @@ export default function AdminPageClient() {
     if (sessionStatusCounts.ready > 0) {
       items.push({
         id: "ready",
-        title: "Ready sessions",
-        body: `${sessionStatusCounts.ready} session${sessionStatusCounts.ready === 1 ? "" : "s"} waiting for candidates.`,
+        title: "Ready interviews",
+        body: `${sessionStatusCounts.ready} interview${sessionStatusCounts.ready === 1 ? "" : "s"} waiting for candidates.`,
         time: "Today",
         section: "sessions",
       });
@@ -2132,7 +2242,7 @@ export default function AdminPageClient() {
       items.push({
         id: "completed",
         title: "Completed interviews",
-        body: `${sessionStatusCounts.completed} completed session${sessionStatusCounts.completed === 1 ? "" : "s"} available for review.`,
+        body: `${sessionStatusCounts.completed} completed interview${sessionStatusCounts.completed === 1 ? "" : "s"} available for review.`,
         time: "Updated",
         section: "sessions",
       });
@@ -2141,7 +2251,7 @@ export default function AdminPageClient() {
       items.push({
         id: "empty",
         title: "You're all caught up",
-        body: "No new alerts right now. New session activity will appear here.",
+        body: "No new alerts right now. New interview activity will appear here.",
         time: "Just now",
       });
     }
@@ -2179,36 +2289,39 @@ export default function AdminPageClient() {
   function handleNotificationClick(item: NotificationItem) {
     markNotificationsRead([item.id]);
     setNotificationsOpen(false);
+    if (item.section === "sessions") {
+      goToOpening("sessions");
+      return;
+    }
+    if (item.section === "requirements") {
+      goToOpening("openings");
+      return;
+    }
     if (item.section) {
       setActiveSection(item.section);
     }
   }
 
-  const utilizationRate = dashboardData?.utilizationRate ?? 0;
+  const invitesSentCount = dashboardData?.invites.sent ?? 0;
+  const startedRate =
+    invitesSentCount > 0
+      ? Math.round(((dashboardData?.invites.used ?? 0) / invitesSentCount) * 100)
+      : 0;
+
+  useEffect(() => {
+    closeAllViewers();
+  }, [pathname]);
 
   useEffect(() => {
     let active = true;
     void (async () => {
-      const results = await Promise.all([
-        refreshSessions(),
-        refreshAuthCompany(),
-        refreshDashboard(),
-        refreshSupportTickets(),
-      ]);
-      if (!active) return;
-      const firstError = results.find((message): message is string => Boolean(message));
-      if (firstError) setError(firstError);
+      const err = await refreshAuthCompany();
+      if (active && err) setError(err);
     })();
     return () => {
       active = false;
     };
-  }, [refreshSessions, refreshAuthCompany, refreshDashboard, refreshSupportTickets]);
-
-  useEffect(() => {
-    if (activeSection === "support") {
-      void refreshSupportTickets();
-    }
-  }, [activeSection, refreshSupportTickets]);
+  }, [refreshAuthCompany]);
 
   useEffect(() => {
     setSessionPage(1);
@@ -2221,28 +2334,16 @@ export default function AdminPageClient() {
 
   useEffect(() => {
     setCandidatePage(1);
-  }, [candidateSearch, candidateStatusFilter]);
-
-  useEffect(() => {
-    if (activeSection !== "candidates") return;
-    let active = true;
-    void (async () => {
-      const err = await refreshCandidates();
-      if (active && err) setError(err);
-    })();
-    return () => {
-      active = false;
-    };
-  }, [activeSection, refreshCandidates, candidatePage, candidateSearch, candidateStatusFilter]);
+  }, [candidateSearch]);
 
   useEffect(() => {
     let active = true;
     void (async () => {
       const tasks: Array<Promise<string | null>> = [];
-      if (activeSection === "dashboard") {
+      if (activeSection === "dashboard" || activeSection === "overview") {
         tasks.push(refreshDashboard());
       }
-      if (activeSection === "sessions" || activeSection === "overview") {
+      if (activeSection === "overview" || (activeSection === "requirements" && openingTab === "sessions")) {
         tasks.push(refreshSessions());
       }
       if (activeSection === "overview") {
@@ -2250,6 +2351,12 @@ export default function AdminPageClient() {
       }
       if (activeSection === "requirements") {
         tasks.push(refreshRequirements());
+      }
+      if (activeSection === "candidates") {
+        tasks.push(refreshCandidates());
+      }
+      if (activeSection === "support") {
+        tasks.push(refreshSupportTickets());
       }
       if (activeSection === "settings" || activeSection === "profile" || activeSection === "app-settings") {
         tasks.push(refreshInterviewerSettings());
@@ -2263,34 +2370,30 @@ export default function AdminPageClient() {
     return () => {
       active = false;
     };
-  }, [activeSection, refreshCandidates, refreshDashboard, refreshInterviewerSettings, refreshOverviewRequirements, refreshRequirements, refreshSessions]);
+  }, [
+    activeSection,
+    openingTab,
+    refreshCandidates,
+    refreshDashboard,
+    refreshInterviewerSettings,
+    refreshOverviewRequirements,
+    refreshRequirements,
+    refreshSessions,
+    refreshSupportTickets,
+  ]);
 
   useEffect(() => {
-    if (activeSection !== "dashboard") return;
-    let active = true;
-    void (async () => {
-      const errorMessage = await refreshDashboard(dashboardPeriod);
-      if (!active || !errorMessage) return;
-      setError(errorMessage);
-    })();
-    return () => {
-      active = false;
-    };
-  }, [dashboardPeriod, activeSection, refreshDashboard]);
-
-  useEffect(() => {
-    if (activeSection !== "dashboard" && activeSection !== "overview") return;
-    const interval = window.setInterval(() => {
-      void refreshDashboard(dashboardPeriod);
-      if (activeSection === "overview") {
-        void refreshSessions();
+    if (activeSection !== "overview") return;
+    let shouldFocus = draftScrollToken > 0;
+    if (!shouldFocus) {
+      try {
+        shouldFocus = sessionStorage.getItem("uhired-admin-focus-draft") === "1";
+        if (shouldFocus) sessionStorage.removeItem("uhired-admin-focus-draft");
+      } catch {
+        // ignore
       }
-    }, DASHBOARD_AUTO_REFRESH_MS);
-    return () => window.clearInterval(interval);
-  }, [activeSection, dashboardPeriod, refreshDashboard, refreshSessions]);
-
-  useEffect(() => {
-    if (!draftScrollToken || activeSection !== "overview") return;
+    }
+    if (!shouldFocus) return;
 
     const frame = window.requestAnimationFrame(() => {
       draftSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2449,20 +2552,15 @@ export default function AdminPageClient() {
         : null,
     [editor, requirements],
   );
-  const visibleCandidates = candidates;
-
   const navCounts = useMemo(
     () => ({
+      overview: sessionStatusCounts.open,
       sessions: sessionStatusCounts.total,
       candidates: candidateMetrics.total,
       requirements: requirementsTotal,
     }),
-    [sessionStatusCounts.total, candidateMetrics.total, requirementsTotal],
+    [sessionStatusCounts.open, sessionStatusCounts.total, candidateMetrics.total, requirementsTotal],
   );
-
-  const candidatePageStart =
-    candidatesTotal === 0 ? 0 : (candidatePage - 1) * CANDIDATE_PAGE_SIZE + 1;
-  const candidatePageEnd = Math.min(candidatePage * CANDIDATE_PAGE_SIZE, candidatesTotal);
 
   const sessionPageStart = sessionsTotal === 0 ? 0 : (sessionPage - 1) * SESSION_PAGE_SIZE + 1;
   const sessionPageEnd = Math.min(sessionPage * SESSION_PAGE_SIZE, sessionsTotal);
@@ -2470,215 +2568,168 @@ export default function AdminPageClient() {
     requirementsTotal === 0 ? 0 : (requirementPage - 1) * REQUIREMENT_PAGE_SIZE + 1;
   const requirementPageEnd = Math.min(requirementPage * REQUIREMENT_PAGE_SIZE, requirementsTotal);
 
-  const visibleOverviewRequirements = useMemo(() => {
-    if (previousRequirementsExpanded) return overviewRequirements;
-    return overviewRequirements.slice(0, PREVIOUS_REQUIREMENTS_PREVIEW);
-  }, [overviewRequirements, previousRequirementsExpanded]);
+  const previousRoleOptions = useMemo(() => {
+    const query = targetRole.trim().toLowerCase();
+    return overviewRequirements
+      .map((requirement) => ({
+        requirement,
+        label: requirement.title?.trim() || requirement.domain,
+      }))
+      .filter((row) => !query || row.label.toLowerCase().includes(query));
+  }, [overviewRequirements, targetRole]);
 
-  const hiddenOverviewRequirementsCount = Math.max(
-    0,
-    overviewRequirements.length - PREVIOUS_REQUIREMENTS_PREVIEW,
-  );
+  const inviteGuideOpenings = overviewRequirements.length;
+  const latestSavedOpening = overviewRequirements[0]
+    ? overviewRequirements[0].title?.trim() || overviewRequirements[0].domain
+    : null;
+  const unusedInviteCount = overviewRequirements.reduce((count, requirement) => {
+    return count + (requirement.candidateInvites ?? []).filter((invite) => !invite.usedAt).length;
+  }, 0);
+
+  const headerSubtitle =
+    activeSection === "dashboard" ? (
+      <>
+        Track openings, invites, interviews, and candidate scores for{" "}
+        <span className="font-medium text-foreground">{authCompanyName}</span>
+      </>
+    ) : activeSection === "overview" ? (
+      <>Create a job opening, add candidate emails, and send invites</>
+    ) : activeSection === "requirements" && openingTab === "sessions" ? (
+      <>Review interviews linked to your saved job openings</>
+    ) : activeSection === "candidates" ? (
+      <>Track every candidate in your hiring pipeline</>
+    ) : activeSection === "support" ? (
+      <>Get help with invites, sessions, and scoring</>
+    ) : activeSection === "requirements" ? (
+      <>Reuse saved openings or open one to review related interviews</>
+    ) : activeSection === "settings" ? (
+      <>Choose the interviewer name and voice candidates will hear</>
+    ) : (
+      <>Signed in as {authCompanyName}</>
+    );
+
+  const supportsHeaderSearch = activeSection === "candidates" || activeSection === "requirements";
+  const headerSearchPlaceholder =
+    activeSection === "candidates"
+      ? "Search candidates"
+      : activeSection === "requirements" && openingTab === "sessions"
+        ? "Search interviews by candidate, role, or code"
+        : activeSection === "requirements"
+          ? "Search job openings"
+          : "Open Candidates or Job Openings to search";
+
+  const isViewPage =
+    detailSession !== null ||
+    detailLoading ||
+    candidateViewer !== null ||
+    candidateViewerLoading ||
+    requirementViewer !== null;
+  const viewPageTitle = editor
+    ? editor.kind === "requirement"
+      ? "Edit Opening"
+      : editor.kind === "session"
+        ? "Edit Session"
+        : "Edit Candidate"
+    : detailSession || detailLoading
+      ? "Session"
+      : candidateViewer || candidateViewerLoading
+        ? "Candidate"
+        : requirementViewer
+          ? "Opening"
+          : null;
 
   return (
-    <div className="admin-shell relative flex min-h-screen flex-col lg:flex-row">
-      {/* Sidebar */}
-      <aside className="admin-sidebar z-30 flex w-full flex-col overflow-y-auto border-b p-5 lg:fixed lg:left-0 lg:top-0 lg:h-screen lg:w-[17rem] lg:border-b-0 lg:border-r">
-        <div className="mb-6 px-1">
-          <AdminPortalLogo subtitle="ADMIN PORTAL" />
-        </div>
-
-        <nav className="flex flex-1 flex-col gap-5">
-          <div>
-            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Workspace</p>
-            <div className="flex flex-col gap-0.5">
-              {workspaceNavItems.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => setActiveSection(item.key)}
-                  className={`admin-nav-item flex items-center gap-3 px-3 py-2.5 text-left text-sm font-semibold ${
-                    activeSection === item.key
-                      ? "admin-nav-item-active"
-                      : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-                  }`}
-                >
-                  <item.icon className="h-4 w-4 shrink-0" strokeWidth={2} />
-                  <span className="flex-1">{item.label}</span>
-                  {item.key in navCounts ? (
-                    <span className="admin-nav-count">
-                      {navCounts[item.key as keyof typeof navCounts]}
-                    </span>
-                  ) : null}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">System</p>
-            <div className="flex flex-col gap-0.5">
-              {systemNavItems.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => setActiveSection(item.key === "analytics" ? "dashboard" : item.key)}
-                  className={`admin-nav-item flex items-center gap-3 px-3 py-2.5 text-left text-sm font-semibold ${
-                    activeSection === item.key
-                      ? "admin-nav-item-active"
-                      : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-                  }`}
-                >
-                  <item.icon className="h-4 w-4 shrink-0" strokeWidth={2} />
-                  <span className="flex-1">{item.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </nav>
-
-        <button
-          type="button"
-          onClick={scrollToDraft}
-          className="admin-btn-primary mb-3 mt-4 w-full py-3"
-        >
-          <PlusCircle className="h-4 w-4" />
-          Invite Candidates
-        </button>
-
-        <div className="mt-auto space-y-3 border-t border-white/10 pt-5">
-          <button
-            type="button"
-            onClick={() => void manualRefreshAllData()}
-            disabled={manualRefreshBusy}
-            className="admin-btn-ghost mb-1 w-full py-2.5 disabled:opacity-50"
-          >
-            {manualRefreshBusy ? "Refreshing…" : "Load / Refresh Data"}
-          </button>
-          <div className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2.5 ring-1 ring-white/10 backdrop-blur-sm">
-            <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-primary-foreground"
-              style={{ background: "var(--gradient-brand)" }}
-              title={`${authCompanyName} company admin`}
-            >
-              {authCompanyName.charAt(0).toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground">{authCompanyName}</p>
-              <p className="text-[11px] text-muted-foreground">Tenant Admin</p>
-            </div>
-          </div>
-          <div className="admin-sidebar-promo">
-            <p className="text-sm font-bold text-foreground">Upgrade your hiring</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-              Unlock more seats, advanced analytics, and priority support.
-            </p>
-            <a
-              href="/pricing"
-              className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-white/10 px-3 py-2 text-xs font-bold text-foreground ring-1 ring-white/15 transition hover:bg-white/15"
-            >
-              Explore Plans
-            </a>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <div className="flex min-h-screen flex-1 flex-col lg:ml-[17rem]">
-        <header className="admin-header sticky top-0 z-50 flex h-[4.25rem] items-center justify-between gap-4 border-b px-5 sm:px-8">
-          <div className="min-w-0 shrink-0">
-            <h1 className="font-display text-2xl font-extrabold tracking-tight text-foreground">
-              {sectionTitles[activeSection] ?? "Admin Portal"}
-            </h1>
-            <p className="truncate text-xs font-medium text-muted-foreground">
-              {activeSection === "dashboard" ? (
-                <>
-                  Welcome back, <span className="font-semibold text-foreground">{authCompanyName}</span>
-                  ! Here&apos;s your hiring pipeline overview.
-                </>
-              ) : activeSection === "overview" ? (
-                <>
-                  Signed in as <span className="font-semibold text-foreground">{authCompanyName}</span>
-                  {" · set up your next interview session"}
-                </>
-              ) : activeSection === "sessions" ? (
-                <>Search and manage all {sessionsTotal} interview sessions</>
-              ) : activeSection === "candidates" ? (
-                <>
-                  Signed in as <span className="font-semibold text-foreground">{authCompanyName}</span>
-                </>
-              ) : activeSection === "requirements" ? (
-                <>
-                  Signed in as <span className="font-semibold text-foreground">{authCompanyName}</span>
-                </>
-              ) : activeSection === "support" ? (
-                <>
-                  Signed in as <span className="font-semibold text-foreground">{authCompanyName}</span>
-                  {" · get help with invites, sessions, and scoring"}
-                </>
-              ) : activeSection === "profile" ? (
-                <>
-                  Signed in as <span className="font-semibold text-foreground">{authCompanyName}</span>
-                  {" · manage your company profile and password"}
-                </>
-              ) : (
-                <>
-                  Signed in as <span className="font-semibold text-foreground">{authCompanyName}</span>
-                </>
-              )}
-            </p>
-          </div>
-
+    <>
+    <AppShell
+      brandTitle="Uhired"
+      brandSubtitle="Admin Portal"
+      headerTitle={
+        viewPageTitle ??
+        (activeSection === "requirements" && openingTab === "sessions"
+          ? "Opening Interviews"
+          : sectionTitles[activeSection] ?? "Admin Portal")
+      }
+      headerSubtitle={editor ? "Update details" : viewPageTitle ? "View details" : headerSubtitle}
+      primaryAction={{
+        label: "Quick Invite",
+        icon: PlusCircle,
+        onClick: scrollToDraft,
+      }}
+      secondaryAction={{
+        label: "Support",
+        icon: Mail,
+        href: "/admin/support",
+      }}
+      navGroups={[
+        {
+          items: workspaceNavItems.map((item) => ({
+            key: item.key,
+            label: item.label,
+            icon: item.icon,
+            href: adminNavHref(item.key),
+            active:
+              item.key === "requirements"
+                ? activeSection === "requirements" && openingTab === "openings"
+                : item.key === "sessions"
+                  ? activeSection === "requirements" && openingTab === "sessions"
+                  : activeSection === item.key,
+            count: item.key in navCounts ? navCounts[item.key as keyof typeof navCounts] : undefined,
+          })),
+        },
+        {
+          label: "Setup",
+          items: systemNavItems.map((item) => ({
+            key: item.key,
+            label: item.label,
+            icon: item.icon,
+            href: adminNavHref(item.key),
+            active: activeSection === item.key,
+          })),
+        },
+      ]}
+      headerSearch={
           <label className="admin-header-search mx-auto">
             <Search className="h-4 w-4 shrink-0 opacity-70" />
             <input
               type="search"
-              placeholder="Search anything..."
+              placeholder={headerSearchPlaceholder}
+              disabled={!supportsHeaderSearch}
               value={
-                activeSection === "sessions"
-                  ? sessionSearch
-                  : activeSection === "candidates"
-                    ? candidateSearch
-                    : activeSection === "requirements"
-                      ? requirementSearch
-                      : ""
+                activeSection === "candidates"
+                  ? candidateSearch
+                  : activeSection === "requirements"
+                    ? openingTab === "sessions"
+                      ? sessionSearch
+                      : requirementSearch
+                    : ""
               }
               onChange={(e) => {
                 const v = e.target.value;
-                if (activeSection === "sessions") setSessionSearch(v);
-                else if (activeSection === "candidates") setCandidateSearch(v);
+                if (!supportsHeaderSearch) return;
+                if (activeSection === "candidates") setCandidateSearch(v);
+                else if (activeSection === "requirements" && openingTab === "sessions") setSessionSearch(v);
                 else if (activeSection === "requirements") setRequirementSearch(v);
-                else if (v.trim()) {
-                  setSessionSearch(v);
-                  setActiveSection("sessions");
-                }
               }}
-              onFocus={() => {
-                if (
-                  activeSection !== "sessions" &&
-                  activeSection !== "candidates" &&
-                  activeSection !== "requirements"
-                ) {
-                  /* keep current section until user types */
-                }
-              }}
-              aria-label="Search"
+              onFocus={() => undefined}
+              aria-label={headerSearchPlaceholder}
+              className={!supportsHeaderSearch ? "cursor-not-allowed opacity-60" : undefined}
             />
             <kbd>⌘ K</kbd>
           </label>
-
-          <div className="relative flex shrink-0 items-center gap-2 sm:gap-3" ref={headerMenuRef}>
+      }
+      headerActions={
+          <div className="relative flex shrink-0 items-center gap-1.5 sm:gap-2" ref={headerMenuRef}>
             <div
-              className="flex items-center rounded-xl border border-border bg-surface/60 p-0.5 shadow-sm"
+              className="flex items-center rounded-lg border border-border bg-background p-0.5"
               role="group"
               aria-label="Theme"
             >
               <button
                 type="button"
                 onClick={() => applyTheme("light")}
-                className={`rounded-lg p-2 transition ${
+                className={`rounded-md p-1.5 transition ${
                   theme === "light"
-                    ? "bg-surface text-foreground shadow-sm ring-1 ring-border"
+                    ? "bg-muted text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
                 aria-label="Light theme"
@@ -2689,9 +2740,9 @@ export default function AdminPageClient() {
               <button
                 type="button"
                 onClick={() => applyTheme("dark")}
-                className={`rounded-lg p-2 transition ${
+                className={`rounded-md p-1.5 transition ${
                   theme === "dark"
-                    ? "bg-surface text-foreground shadow-sm ring-1 ring-border"
+                    ? "bg-muted text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
                 aria-label="Dark theme"
@@ -2714,7 +2765,7 @@ export default function AdminPageClient() {
                   });
                   setProfileMenuOpen(false);
                 }}
-                className="relative rounded-xl p-2.5 text-muted-foreground ring-1 ring-border transition-colors hover:bg-surface/80 hover:text-foreground"
+                className="text-muted-foreground hover:bg-muted hover:text-foreground relative rounded-lg p-2 transition-colors"
                 aria-label="Notifications"
               >
                 <Bell className="h-5 w-5" />
@@ -2755,11 +2806,11 @@ export default function AdminPageClient() {
                       type="button"
                       onClick={() => {
                         setNotificationsOpen(false);
-                        setActiveSection("sessions");
+                        goToOpening("sessions");
                       }}
                       className="w-full rounded-lg px-3 py-2 text-left text-xs font-bold text-primary hover:bg-surface/80"
                     >
-                      View interview sessions →
+                      View all interviews →
                     </button>
                   </div>
                 </div>
@@ -2773,7 +2824,7 @@ export default function AdminPageClient() {
                   setProfileMenuOpen((o) => !o);
                   setNotificationsOpen(false);
                 }}
-                className="flex items-center gap-2.5 rounded-full border border-border bg-surface/60 py-1 pl-1 pr-2.5 shadow-sm backdrop-blur-sm transition hover:bg-surface hover:ring-1 hover:ring-primary/20"
+                className="hover:bg-muted flex items-center gap-2 rounded-lg border border-border bg-background py-1 pl-1 pr-2 transition"
               >
                 <div
                   className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-primary-foreground"
@@ -2848,9 +2899,397 @@ export default function AdminPageClient() {
               ) : null}
             </div>
           </div>
-        </header>
+      }
+      sidebarFooter={
+        <div className="px-1 pb-1">
+          <div className="flex items-center gap-2 rounded-lg px-2 py-1.5">
+            <div className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
+              {authCompanyName.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{authCompanyName}</p>
+              <p className="text-muted-foreground truncate text-xs">Company Admin</p>
+            </div>
+          </div>
+        </div>
+      }
+      footer={
+        <footer className="admin-footer mt-auto border-t py-4">
+          <div className="text-muted-foreground mx-auto flex max-w-[100rem] flex-col items-center justify-between gap-3 px-4 text-xs sm:flex-row sm:px-6">
+            <span>© 2026 UHIRED. All rights reserved.</span>
+            <div className="flex flex-wrap justify-center gap-4">
+              <a href="/privacy" className="hover:text-foreground">
+                Privacy Policy
+              </a>
+              <a href="/terms" className="hover:text-foreground">
+                Terms of Service
+              </a>
+              <a href="#" className="hover:text-foreground font-medium">
+                Security
+              </a>
+            </div>
+          </div>
+        </footer>
+      }
+    >
+          {editor ? (
+            <section className="admin-invites space-y-3">
+              <div className="admin-card px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => closeEditor()}
+                  className="text-muted-foreground hover:text-foreground mb-2 inline-flex items-center gap-1.5 text-xs font-medium"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+                  Back
+                </button>
+                <h2 className="text-lg font-semibold">
+                  {editor.kind === "requirement"
+                    ? "Edit Opening"
+                    : editor.kind === "session"
+                      ? "Edit Session"
+                      : "Edit Candidate"}
+                </h2>
+              </div>
 
-        <div className="mx-auto w-full max-w-[88rem] flex-1 space-y-6 p-5 sm:p-8">
+            {editor.kind === "session" ? (
+              sessionEditLoading ? (
+                <p className="text-muted-foreground py-8 text-center text-sm">Loading session details…</p>
+              ) : sessionEditDetail ? (
+                <form
+                  className="admin-card space-y-3 p-3"
+                  onSubmit={(e) => void saveSessionEdit(e, sessionEditDetail.id)}
+                >
+                  <p className="text-muted-foreground text-xs">
+                    Status <span className="text-foreground font-medium">{sessionEditDetail.status}</span>
+                    {" · "}
+                    <code className="admin-code-badge admin-code-badge-sm">
+                      {formatSessionInviteCode(sessionEditDetail)}
+                    </code>
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label>
+                      <span className="admin-label">Candidate name</span>
+                      <input
+                        name="candidateName"
+                        defaultValue={sessionEditDetail.candidateName ?? ""}
+                        className="admin-input"
+                      />
+                    </label>
+                    <label>
+                      <span className="admin-label">Candidate email</span>
+                      <input
+                        name="candidateEmail"
+                        type="email"
+                        defaultValue={sessionEditDetail.candidateEmail ?? ""}
+                        className="admin-input"
+                      />
+                    </label>
+                  </div>
+                  {sessionEditDetail.status === "COMPLETED" ? (
+                    <p className="text-muted-foreground text-xs">
+                      Completed session — only candidate name and email can be updated.
+                    </p>
+                  ) : (
+                    <>
+                      <label>
+                        <span className="admin-label">Position / role</span>
+                        <input
+                          name="positionTitle"
+                          defaultValue={sessionEditDetail.positionTitle ?? ""}
+                          className="admin-input"
+                          required
+                        />
+                      </label>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label>
+                          <span className="admin-label">Domain</span>
+                          <input name="domain" defaultValue={sessionEditDetail.domain} className="admin-input" required />
+                        </label>
+                        <label>
+                          <span className="admin-label">Topic</span>
+                          <input name="topic" defaultValue={sessionEditDetail.topic} className="admin-input" required />
+                        </label>
+                        <label>
+                          <span className="admin-label">Duration (min)</span>
+                          <input
+                            name="durationMin"
+                            type="number"
+                            min={5}
+                            max={120}
+                            defaultValue={sessionEditDetail.durationMin}
+                            className="admin-input"
+                            required
+                          />
+                        </label>
+                        <label>
+                          <span className="admin-label">Max optional Qs</span>
+                          <input
+                            name="maxOptionalQuestions"
+                            type="number"
+                            min={0}
+                            max={20}
+                            defaultValue={sessionEditDetail.maxOptionalQuestions}
+                            className="admin-input"
+                          />
+                        </label>
+                      </div>
+                      <label>
+                        <span className="admin-label">Job description</span>
+                        <textarea
+                          name="jobDescription"
+                          rows={3}
+                          defaultValue={sessionEditDetail.jobDescription ?? ""}
+                          className="admin-input min-h-[5rem] resize-y"
+                        />
+                      </label>
+                      <label>
+                        <span className="admin-label">Key skills</span>
+                        <input
+                          name="keySkills"
+                          defaultValue={formatSessionKeySkills(sessionEditDetail.keySkills)}
+                          className="admin-input"
+                        />
+                      </label>
+                      <label>
+                        <span className="admin-label">Mandatory questions</span>
+                        <textarea
+                          name="mandatoryQuestions"
+                          rows={3}
+                          defaultValue={sessionMandatoryPrompts(sessionEditDetail)}
+                          className="admin-input min-h-[5rem] resize-y"
+                        />
+                      </label>
+                      <label>
+                        <span className="admin-label">Optional questions</span>
+                        <textarea
+                          name="optionalQuestions"
+                          rows={3}
+                          defaultValue={sessionOptionalPrompts(sessionEditDetail)}
+                          className="admin-input min-h-[5rem] resize-y"
+                        />
+                      </label>
+                    </>
+                  )}
+                  <div className="flex gap-2 pt-1">
+                    <button type="submit" className="admin-btn-primary px-4 py-2 text-xs">Save</button>
+                    <button type="button" onClick={() => closeEditor()} className="admin-btn-ghost px-4 py-2 text-xs">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <p className="text-muted-foreground py-6 text-center text-sm">Unable to load session.</p>
+              )
+            ) : null}
+
+            {editor.kind === "candidate" && editingCandidate ? (
+              <form
+                className="admin-card space-y-3 p-3"
+                onSubmit={(e) => void saveCandidateEdit(e, editingCandidate.candidateId)}
+              >
+                <p className="text-muted-foreground text-xs">
+                  Sessions {editingCandidate.sessionsCount} · Latest {editingCandidate.latestStatus}
+                  {editingCandidate.latestScore != null ? ` · ${editingCandidate.latestScore}%` : ""}
+                </p>
+                <label>
+                  <span className="admin-label">Candidate name</span>
+                  <input
+                    name="candidateName"
+                    defaultValue={editingCandidate.candidateName ?? ""}
+                    className="admin-input"
+                    required
+                  />
+                </label>
+                <label>
+                  <span className="admin-label">Candidate email</span>
+                  <input
+                    name="candidateEmail"
+                    type="email"
+                    defaultValue={editingCandidate.candidateEmail ?? ""}
+                    className="admin-input"
+                  />
+                </label>
+                <div className="flex gap-2 pt-1">
+                  <button type="submit" className="admin-btn-primary px-4 py-2 text-xs">Save</button>
+                  <button type="button" onClick={() => closeEditor()} className="admin-btn-ghost px-4 py-2 text-xs">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : null}
+
+            {editor.kind === "requirement" && editingRequirement ? (
+              <form
+                className="admin-card space-y-3 p-3"
+                onSubmit={(e) => void saveRequirementEdit(e, editingRequirement.requirementId)}
+              >
+                <p className="text-muted-foreground text-xs">
+                  {editingRequirement.sessionsCount} session{editingRequirement.sessionsCount === 1 ? "" : "s"} ·{" "}
+                  {editingRequirement.candidateInvites?.length ?? 0} invite
+                  {(editingRequirement.candidateInvites?.length ?? 0) === 1 ? "" : "s"}
+                </p>
+                <label>
+                  <span className="admin-label">Target role</span>
+                  <input
+                    name="title"
+                    defaultValue={editingRequirement.title ?? ""}
+                    placeholder="e.g. Product Designer"
+                    className="admin-input"
+                  />
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label>
+                    <span className="admin-label">Domain</span>
+                    <input
+                      name="domain"
+                      defaultValue={editingRequirement.domain}
+                      className="admin-input"
+                      required
+                    />
+                  </label>
+                  <label>
+                    <span className="admin-label">Topic</span>
+                    <input
+                      name="topic"
+                      defaultValue={editingRequirement.topic}
+                      className="admin-input"
+                      required
+                    />
+                  </label>
+                  <label>
+                    <span className="admin-label">Duration (min)</span>
+                    <input
+                      name="durationMin"
+                      type="number"
+                      min={5}
+                      max={120}
+                      defaultValue={editingRequirement.durationMin}
+                      className="admin-input"
+                      required
+                    />
+                  </label>
+                  <label>
+                    <span className="admin-label">Max optional Qs</span>
+                    <input
+                      name="maxOptionalQuestions"
+                      type="number"
+                      min={0}
+                      max={20}
+                      defaultValue={editingRequirement.maxOptionalQuestions}
+                      className="admin-input"
+                    />
+                  </label>
+                </div>
+                <label>
+                  <span className="admin-label">Job description</span>
+                  <textarea
+                    name="jobDescription"
+                    defaultValue={editingRequirement.jobDescription ?? ""}
+                    rows={3}
+                    className="admin-input min-h-[5rem] resize-y"
+                  />
+                </label>
+                <label>
+                  <span className="admin-label">Key skills</span>
+                  <input
+                    name="keySkills"
+                    defaultValue={
+                      Array.isArray(editingRequirement.keySkills)
+                        ? editingRequirement.keySkills.join(", ")
+                        : ""
+                    }
+                    className="admin-input"
+                  />
+                </label>
+                <label>
+                  <span className="admin-label">Mandatory questions</span>
+                  <textarea
+                    name="mandatoryQuestions"
+                    defaultValue={editingRequirement.mandatoryQuestions.join("\n")}
+                    rows={4}
+                    className="admin-input min-h-[6rem] resize-y"
+                  />
+                </label>
+                <label>
+                  <span className="admin-label">Optional questions</span>
+                  <textarea
+                    name="optionalQuestions"
+                    defaultValue={editingRequirement.optionalQuestions.join("\n")}
+                    rows={3}
+                    className="admin-input min-h-[5rem] resize-y"
+                  />
+                </label>
+                <div className="flex gap-2 pt-1">
+                  <button type="submit" className="admin-btn-primary px-4 py-2 text-xs">Save</button>
+                  <button type="button" onClick={() => closeEditor()} className="admin-btn-ghost px-4 py-2 text-xs">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : editor.kind === "requirement" ? (
+              <p className="text-muted-foreground py-6 text-center text-sm">Unable to load opening.</p>
+            ) : null}
+            </section>
+          ) : isViewPage ? (
+            <>
+              <AdminCandidateDetailModal
+                open={candidateViewer !== null || candidateViewerLoading}
+                loading={candidateViewerLoading}
+                detail={candidateViewer}
+                onClose={closeCandidateViewer}
+                onEdit={(candidateId) => {
+                  setCandidateViewer(null);
+                  setEditor({ kind: "candidate", recordId: candidateId });
+                }}
+                onViewSession={(sessionId) => void openSessionDetail(sessionId)}
+                onEditSession={(sessionId) => void openSessionEditor(sessionId)}
+              />
+              <AdminSessionDetailModal
+                open={detailSession !== null || detailLoading}
+                loading={detailLoading}
+                session={detailSession}
+                inviteCode={detailSession ? formatSessionInviteCode(detailSession) : ""}
+                onClose={() => {
+                  setDetailSession(null);
+                  setDetailLoading(false);
+                }}
+                onEdit={(id) => void openSessionEditor(id)}
+                regradeBusy={regradeBusy}
+                onRunAnswerGrading={(id) => void runAnswerGrading(id)}
+                observerLinkBusy={observerLinkBusy}
+                onCreateObserverLink={() => void createObserverLink()}
+                observerLinkUrl={observerLinkUrl}
+                observerLinks={observerLinks}
+                onRevokeObserverLink={(linkId) => void revokeObserverLink(linkId)}
+                onCopy={(text, message) => void copyCode(text, message)}
+                scorecardShareTtlDays={scorecardShareTtlDays}
+                onScorecardShareTtlDaysChange={setScorecardShareTtlDays}
+                scorecardShareIncludeName={scorecardShareIncludeName}
+                onScorecardShareIncludeNameChange={setScorecardShareIncludeName}
+                scorecardShareBusy={scorecardShareBusy}
+                onCreateScorecardShareLink={() => void createScorecardShareLink()}
+                scorecardShareLinks={scorecardShareLinks}
+                lastCreatedShare={lastCreatedShare}
+                onRevokeScorecardShareLink={(linkId) => void revokeScorecardShareLink(linkId)}
+                holisticFormula={HOLISTIC_OVERALL_FORMULA}
+                overallWithAnswerNote={OVERALL_WITH_ANSWER_GRADING_NOTE}
+              />
+              <AdminRequirementDetailModal
+                open={requirementViewer !== null}
+                requirement={requirementViewer}
+                onClose={() => setRequirementViewer(null)}
+                onOpenSession={(sessionId) => {
+                  setRequirementViewer(null);
+                  void openSessionDetail(sessionId);
+                }}
+                onCopyShareLink={(requirement) => void copyOpeningShareLink(requirement)}
+                onScheduleInvite={(input) => scheduleOpeningInvite(input)}
+                scheduleBusyEmail={scheduleBusyEmail}
+              />
+            </>
+          ) : (
+          <>
           {activeSection === "dashboard" ? (
             <AdminDashboard
               companyName={authCompanyName}
@@ -2864,798 +3303,195 @@ export default function AdminPageClient() {
               formatRelativeTime={formatRelativeTime}
             />
           ) : null}
-          {activeSection === "sessions" ? (
-            <section className="space-y-4">
-              <div className="admin-card p-4 md:p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-                  <div className="flex flex-wrap gap-2">
-                    {SESSION_QUICK_VIEWS.map((view) => (
-                      <button
-                        key={view.key}
-                        type="button"
-                        onClick={() => applySessionQuickView(view.key)}
-                        className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
-                          sessionQuickView === view.key
-                            ? "text-primary-foreground shadow-[var(--shadow-glow)]"
-                            : "bg-surface/60 text-muted-foreground ring-1 ring-border hover:bg-surface hover:text-foreground"
-                        }`}
-                        style={
-                          sessionQuickView === view.key
-                            ? { background: "var(--gradient-brand)" }
-                            : undefined
-                        }
-                      >
-                        {view.label}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => saveCurrentSessionView()}
-                    className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold text-primary ring-1 ring-primary/25 transition hover:bg-primary/10"
-                  >
-                    <PlusCircle className="h-3.5 w-3.5" />
-                    Save current view
-                  </button>
-                </div>
-
-                {savedSessionViews.length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {savedSessionViews.map((view) => (
-                      <div
-                        key={view.id}
-                        className="flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200/80"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => applySavedSessionView(view)}
-                          className="hover:text-[#0f172a]"
-                          title="Apply view"
-                        >
-                          {view.name}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteSavedSessionView(view.id)}
-                          className="ml-1 rounded-full px-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                          title="Remove"
-                          aria-label="Remove saved view"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-
-                <div className="mt-4 grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_auto] lg:items-end">
-                  <label className="block space-y-1">
-                    <span className="admin-label">Search</span>
-                    <div className="relative">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        value={sessionSearch}
-                        onChange={(e) => {
-                          setSessionSearch(e.target.value);
-                          setSessionQuickView("all");
-                        }}
-                        placeholder="Role, code, candidate..."
-                        className="admin-input w-full pl-9"
-                      />
-                    </div>
-                  </label>
-                  <label className="block space-y-1">
-                    <span className="admin-label">Status</span>
-                    <select
-                      value={sessionStatusFilter}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setSessionStatusFilter(value);
-                        if (value === "COMPLETED") setSessionQuickView("completed");
-                        else if (value === "READY") setSessionQuickView("ready");
-                        else if (value === "ALL" && sessionRecordingFilter === "all") setSessionQuickView("all");
-                        else setSessionQuickView("all");
-                      }}
-                      className="admin-input w-full"
-                    >
-                      <option value="ALL">All</option>
-                      <option value="READY">READY</option>
-                      <option value="LIVE">LIVE</option>
-                      <option value="COMPLETED">COMPLETED</option>
-                    </select>
-                  </label>
-                  <label className="block space-y-1">
-                    <span className="admin-label">Score (min–max)</span>
-                    <div className="flex gap-2">
-                      <input
-                        value={sessionScoreMin}
-                        onChange={(e) => setSessionScoreMin(e.target.value)}
-                        inputMode="decimal"
-                        placeholder="min"
-                        className="admin-input w-full"
-                      />
-                      <input
-                        value={sessionScoreMax}
-                        onChange={(e) => setSessionScoreMax(e.target.value)}
-                        inputMode="decimal"
-                        placeholder="max"
-                        className="admin-input w-full"
-                      />
-                    </div>
-                  </label>
-                  <label className="block space-y-1">
-                    <span className="admin-label">From</span>
-                    <input
-                      type="date"
-                      value={sessionFrom}
-                      onChange={(e) => setSessionFrom(e.target.value)}
-                      className="admin-input w-full"
-                    />
-                  </label>
-                  <label className="block space-y-1">
-                    <span className="admin-label">To</span>
-                    <input
-                      type="date"
-                      value={sessionTo}
-                      onChange={(e) => setSessionTo(e.target.value)}
-                      className="admin-input w-full"
-                    />
-                  </label>
-                  <button type="button" onClick={resetSessionFilters} className="admin-btn-ghost px-4 py-2.5">
-                    Reset
-                  </button>
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <input
-                    value={saveViewName}
-                    onChange={(e) => setSaveViewName(e.target.value)}
-                    placeholder="Name for saved view…"
-                    className="admin-input w-full max-w-xs text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap items-center gap-3">
-                  <p className="text-sm font-semibold text-slate-700">
-                    Selected: <span className="font-extrabold text-[#0f172a]">{selectedSessionIds.size}</span>
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void exportSelectedSessionsCsv()}
-                    disabled={selectedSessionIds.size === 0}
-                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-emerald-500/20 transition hover:bg-emerald-600 disabled:opacity-50"
-                  >
-                    <Upload className="h-4 w-4" />
-                    Export selected CSV
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void bulkDeleteSelectedSessions()}
-                    disabled={bulkDeleteBusy || selectedSessionIds.size === 0}
-                    className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600 transition hover:bg-red-100 disabled:opacity-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    {bulkDeleteBusy ? "Deleting…" : "Delete selected"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void exportAllFilteredSessionsCsv()}
-                    disabled={bulkExportBusy}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    <FileDown className="h-4 w-4" />
-                    {bulkExportBusy ? "Exporting…" : "Export all (filtered) CSV"}
-                  </button>
-                </div>
-                <p className="text-xs text-slate-500">Tip: Use filters to narrow down, then export all.</p>
-              </div>
-
-              <div className="grid gap-3">
-                {displayedSessions.map((session) => {
-                  const hasRecording = session.videoRecordingStatus === "AVAILABLE";
-                  return (
-                    <div
-                      key={session.id}
-                      className="admin-card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between md:p-5"
-                    >
-                      <div className="flex min-w-0 flex-1 items-start gap-3">
-                        <div className="pt-1">
-                          <input
-                            type="checkbox"
-                            checked={selectedSessionIds.has(session.id)}
-                            onChange={() => toggleSelectedSession(session.id)}
-                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                            aria-label="Select session"
-                          />
-                        </div>
-                        <div
-                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${roleAvatarColor(
-                            session.positionTitle,
-                            session.domain,
-                          )}`}
-                        >
-                          {getRoleInitials(session.positionTitle, session.domain)}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-bold text-[#0f172a]">
-                            {session.positionTitle ?? session.domain}
-                          </p>
-                          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
-                            <span className="font-mono text-[11px] text-slate-600">
-                              {formatSessionInviteCode(session)}
-                            </span>
-                            <span className="text-slate-300">·</span>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${sessionStatusBadgeClass(
-                                session.status,
-                              )}`}
-                            >
-                              {session.status}
-                            </span>
-                            <span className="text-slate-300">·</span>
-                            <span>{session.candidateName ?? "Awaiting candidate"}</span>
-                            {session.interviewDurationDisplay ? (
-                              <>
-                                <span className="text-slate-300">·</span>
-                                <span>{session.interviewDurationDisplay}</span>
-                              </>
-                            ) : null}
-                          </p>
-                          <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold">
-                            {hasRecording ? (
-                              <>
-                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                                <span className="text-emerald-700">Recording: Available</span>
-                              </>
-                            ) : (
-                              <span className="text-slate-500">Recording: Not uploaded</span>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
-                        <button
-                          type="button"
-                          onClick={() => void openSessionDetail(session.id)}
-                          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-                        >
-                          View
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void openSessionEditor(session.id)}
-                          className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-600"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void deleteSessionSubmission(session.id)}
-                          className="rounded-lg border border-red-100 bg-red-50/80 px-4 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-                {!displayedSessions.length ? (
-                  <p className="admin-card p-5 text-sm text-slate-500">No sessions match this filter yet.</p>
-                ) : null}
-              </div>
-              {sessionsTotal > 0 ? (
-                <div className="admin-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-slate-600">
-                    Showing {sessionPageStart}–{sessionPageEnd} of {sessionsTotal} sessions
-                    {sessionRecordingFilter === "no_recording" ? (
-                      <span className="text-slate-400"> · {displayedSessions.length} without recording on this page</span>
-                    ) : null}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="mr-2 flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={
-                          displayedSessions.length > 0 &&
-                          displayedSessions.every((s) => selectedSessionIds.has(s.id))
-                        }
-                        onChange={(e) =>
-                          setAllVisibleSessionsSelected(
-                            e.currentTarget.checked,
-                            displayedSessions.map((s) => s.id),
-                          )
-                        }
-                        className="h-4 w-4 rounded border-slate-300 text-emerald-600"
-                        aria-label="Select all visible sessions"
-                      />
-                      <span className="text-xs font-semibold text-slate-600">Select page</span>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={sessionPage <= 1}
-                      onClick={() => setSessionPage((p) => Math.max(1, p - 1))}
-                      className="admin-btn-ghost disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Previous
-                    </button>
-                    <span className="px-2 text-sm text-slate-600">
-                      Page {sessionPage} of {sessionsTotalPages}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={sessionPage >= sessionsTotalPages}
-                      onClick={() => setSessionPage((p) => Math.min(sessionsTotalPages, p + 1))}
-                      className="admin-btn-ghost disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-
           {activeSection === "candidates" ? (
-            <section className="space-y-5">
-              <div>
-                <h3 className="admin-section-title">Candidates</h3>
-                <p className="mt-1 text-sm text-slate-500">View and manage all candidate records</p>
+            <section className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                {[
+                  { label: "Candidates", value: candidateMetrics.total, hint: "In your pipeline", hot: candidateMetrics.total > 0 },
+                  { label: "Completed", value: candidateMetrics.completedInterview, hint: "Finished interviews", hot: false },
+                  { label: "Ready", value: candidateMetrics.readyNotStarted, hint: "Waiting to start", hot: candidateMetrics.readyNotStarted > 0 },
+                  {
+                    label: "Interviews",
+                    value: candidateMetrics.totalSessions,
+                    hint:
+                      candidateMetrics.totalSessions > 0
+                        ? `${candidateMetrics.avgSessionsPerCandidate} per candidate`
+                        : "No interviews yet",
+                    hot: false,
+                  },
+                ].map((stat) => (
+                  <div key={stat.label} className={`admin-card admin-kpi ${stat.hot ? "admin-kpi-hot" : ""}`}>
+                    <p className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wide">
+                      {stat.label}
+                    </p>
+                    <p className="text-foreground text-xl font-semibold tabular-nums tracking-tight">
+                      {stat.value}
+                    </p>
+                    <p className={`text-[11px] ${stat.hot ? "text-primary font-medium" : "text-muted-foreground"}`}>
+                      {stat.hint}
+                    </p>
+                  </div>
+                ))}
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="admin-card flex items-start justify-between gap-3 p-5">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                      Total candidates
-                    </p>
-                    <p className="mt-2 text-3xl font-black tracking-tight text-[#0f172a]">
-                      {candidateMetrics.total}
-                    </p>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50">
-                    <Users className="h-5 w-5 text-violet-600" />
-                  </div>
-                </div>
-                <div className="admin-card flex items-start justify-between gap-3 p-5">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                      Completed an interview
-                    </p>
-                    <p className="mt-2 text-3xl font-black tracking-tight text-[#0f172a]">
-                      {candidateMetrics.completedInterview}
-                    </p>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                  </div>
-                </div>
-                <div className="admin-card flex items-start justify-between gap-3 p-5">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                      Ready — not started
-                    </p>
-                    <p className="mt-2 text-3xl font-black tracking-tight text-[#0f172a]">
-                      {candidateMetrics.readyNotStarted}
-                    </p>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
-                    <Clock className="h-5 w-5 text-amber-600" />
-                  </div>
-                </div>
-                <div className="admin-card flex items-start justify-between gap-3 p-5">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                      Avg sessions / candidate
-                    </p>
-                    <p className="mt-2 text-3xl font-black tracking-tight text-[#0f172a]">
-                      {candidateMetrics.avgSessionsPerCandidate}
-                    </p>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
-                    <Layers className="h-5 w-5 text-blue-600" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="admin-card p-4 md:p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="relative flex-1">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input
-                      value={candidateSearch}
-                      onChange={(e) => setCandidateSearch(e.target.value)}
-                      placeholder="Search by name, email, or status..."
-                      className="admin-input w-full pl-9"
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {(
-                      [
-                        { key: "ALL", label: "All" },
-                        { key: "COMPLETED", label: "Completed" },
-                        { key: "READY", label: "Ready" },
-                      ] as const
-                    ).map((opt) => (
-                      <button
-                        key={opt.key}
-                        type="button"
-                        onClick={() => setCandidateStatusFilter(opt.key)}
-                        className={`rounded-lg px-4 py-2 text-xs font-bold transition-all ${
-                          candidateStatusFilter === opt.key
-                            ? "bg-[#0f172a] text-white shadow-sm"
-                            : "bg-white text-slate-600 ring-1 ring-slate-200/80 hover:bg-slate-50"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {loadingCandidates ? (
-                <p className="text-sm text-slate-500">Loading candidates…</p>
-              ) : null}
-
-              <div className="admin-card overflow-hidden">
-                {(() => {
-                  const completedRows = visibleCandidates.filter((c) => c.latestStatus === "COMPLETED");
-                  const readyRows = visibleCandidates.filter((c) => c.latestStatus === "READY");
-                  const otherRows = visibleCandidates.filter(
-                    (c) => c.latestStatus !== "COMPLETED" && c.latestStatus !== "READY",
-                  );
-
-                  const renderRow = (candidate: CandidateView) => (
-                    <div
-                      key={candidate.key}
-                      className="flex flex-col gap-4 border-b border-slate-100 px-4 py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between md:px-6"
-                    >
-                      <div className="flex min-w-0 flex-1 items-center gap-4">
-                        <div
-                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xs font-bold ${candidateAvatarColor(
-                            candidate.candidateName,
-                          )}`}
-                        >
-                          {getCandidateInitials(candidate.candidateName)}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-bold text-[#0f172a]">
-                              {candidate.candidateName ?? "Unnamed candidate"}
-                            </p>
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                              {candidate.sessionsCount} session{candidate.sessionsCount !== 1 ? "s" : ""}
-                            </span>
-                          </div>
-                          <p className="mt-0.5 text-xs text-slate-500">
-                            {candidate.candidateEmail ?? "No email"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wide ${candidateStatusBadgeClass(
-                            candidate.latestStatus,
-                          )}`}
-                        >
-                          {candidate.latestStatus}
-                        </span>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void openCandidateViewer(candidate.candidateId)}
-                            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            View
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditor({ kind: "candidate", recordId: candidate.candidateId })}
-                            className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-600"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void deleteCandidateEntry(candidate)}
-                            className="rounded-lg border border-red-100 bg-red-50/80 px-4 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-
-                  if (!visibleCandidates.length && !loadingCandidates) {
-                    return (
-                      <p className="p-6 text-sm text-slate-500">No candidates match this filter yet.</p>
-                    );
-                  }
-
-                  if (candidateStatusFilter === "COMPLETED") {
-                    return (
-                      <div>
-                        <p className="border-b border-slate-100 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 md:px-6">
-                          Completed interviews
-                        </p>
-                        {completedRows.map(renderRow)}
-                      </div>
-                    );
-                  }
-
-                  if (candidateStatusFilter === "READY") {
-                    return (
-                      <div>
-                        <p className="border-b border-slate-100 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 md:px-6">
-                          Ready — not yet started
-                        </p>
-                        {readyRows.map(renderRow)}
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div>
-                      {completedRows.length > 0 ? (
-                        <div>
-                          <p className="border-b border-slate-100 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 md:px-6">
-                            Completed interviews
-                          </p>
-                          {completedRows.map(renderRow)}
-                        </div>
-                      ) : null}
-                      {readyRows.length > 0 ? (
-                        <div>
-                          <p className="border-b border-slate-100 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 md:px-6">
-                            Ready — not yet started
-                          </p>
-                          {readyRows.map(renderRow)}
-                        </div>
-                      ) : null}
-                      {otherRows.length > 0 ? (
-                        <div>
-                          <p className="border-b border-slate-100 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 md:px-6">
-                            Other
-                          </p>
-                          {otherRows.map(renderRow)}
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {candidatesTotal > 0 ? (
-                <div className="admin-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-slate-600">
-                    Showing {candidatePageStart}–{candidatePageEnd} of {candidatesTotal} candidates
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={candidatePage <= 1}
-                      onClick={() => setCandidatePage((p) => Math.max(1, p - 1))}
-                      className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Previous
-                    </button>
-                    <span className="px-2 text-sm text-slate-600">
-                      Page {candidatePage} of {candidatesTotalPages}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={candidatePage >= candidatesTotalPages}
-                      onClick={() => setCandidatePage((p) => Math.min(candidatesTotalPages, p + 1))}
-                      className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              ) : null}
+              <AdminCandidatesTable
+                candidates={candidates}
+                loading={loadingCandidates}
+                search={candidateSearch}
+                onSearchChange={setCandidateSearch}
+                page={candidatePage}
+                onPageChange={setCandidatePage}
+                onView={(candidateId) => void openCandidateViewer(candidateId)}
+                onEdit={(candidateId) => {
+                  setRequirementViewer(null);
+                  setDetailSession(null);
+                  setCandidateViewer(null);
+                  setEditor({ kind: "candidate", recordId: candidateId });
+                }}
+                onDelete={(candidate) => void deleteCandidateEntry(candidate)}
+              />
             </section>
           ) : null}
 
           {activeSection === "settings" ? (
-            <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-start">
-              <div className="admin-card glow-card space-y-6 p-6 sm:p-8">
-                <div className="flex gap-4">
+            <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-start">
+              <div className="admin-card glow-card space-y-3 p-3 sm:p-4">
+                <div className="flex items-center gap-3">
                   <div
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary-foreground shadow-[var(--shadow-glow)]"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-xl text-primary-foreground shadow-[var(--shadow-glow)]"
                     style={{ background: "var(--gradient-brand)" }}
                     aria-hidden
                   >
-                    <Video className="h-5 w-5" strokeWidth={2.25} />
+                    <Video className="h-4 w-4" strokeWidth={2.25} />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="admin-section-title font-display text-xl sm:text-2xl">AI Interviewer</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                      Set how the voice interviewer introduces itself for all {authCompanyName} interviews.
-                      Candidates hear this name in the opening greeting; voice matches Male or Female.
+                    <h3 className="admin-section-title font-display text-base">Interviewer voice</h3>
+                    <p className="text-muted-foreground text-xs">
+                      Set the interviewer name and voice used in every {authCompanyName} interview.
                     </p>
                   </div>
                 </div>
 
-                <label className="block space-y-2">
-                  <span className="admin-label">Interviewer name</span>
-                  <div className="relative">
-                    <User
-                      className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-                      aria-hidden
-                    />
-                    <input
-                      value={interviewerSettings.interviewerName}
-                      onChange={(event) =>
-                        setInterviewerSettings((prev) => ({
-                          ...prev,
-                          interviewerName: event.target.value,
-                        }))
-                      }
-                      placeholder="e.g. Alex, Emma"
-                      className="admin-input pl-10"
-                    />
-                  </div>
-                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block space-y-1">
+                    <span className="admin-label">Interviewer name</span>
+                    <div className="relative">
+                      <User
+                        className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400"
+                        aria-hidden
+                      />
+                      <input
+                        value={interviewerSettings.interviewerName}
+                        onChange={(event) =>
+                          setInterviewerSettings((prev) => ({
+                            ...prev,
+                            interviewerName: event.target.value,
+                          }))
+                        }
+                        placeholder="e.g. Alex, Emma"
+                        className="admin-input pl-9"
+                      />
+                    </div>
+                  </label>
 
-                <label className="block space-y-2">
-                  <span className="admin-label">Voice</span>
-                  <div className="relative">
-                    <Mic
-                      className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-                      aria-hidden
-                    />
-                    <select
-                      value={interviewerSettings.interviewerVoiceGender}
-                      onChange={(event) =>
-                        setInterviewerSettings((prev) => ({
-                          ...prev,
-                          interviewerVoiceGender: event.target.value as "MALE" | "FEMALE",
-                        }))
-                      }
-                      className="admin-input appearance-none pl-10 pr-10"
-                    >
-                      <option value="MALE">Male (Cedar)</option>
-                      <option value="FEMALE">Female (Marin)</option>
-                    </select>
-                    <ChevronDown
-                      className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-                      aria-hidden
-                    />
-                  </div>
-                </label>
+                  <label className="block space-y-1">
+                    <span className="admin-label">Voice</span>
+                    <div className="relative">
+                      <Mic
+                        className="pointer-events-none absolute left-3 top-1/2 z-10 size-3.5 -translate-y-1/2 text-slate-400"
+                        aria-hidden
+                      />
+                      <AppSelect
+                        value={interviewerSettings.interviewerVoiceGender}
+                        onValueChange={(value) =>
+                          setInterviewerSettings((prev) => ({
+                            ...prev,
+                            interviewerVoiceGender: value as "MALE" | "FEMALE",
+                          }))
+                        }
+                        className="!pl-9"
+                        aria-label="Interviewer voice"
+                        options={[
+                          { value: "MALE", label: "Male voice" },
+                          { value: "FEMALE", label: "Female voice" },
+                        ]}
+                      />
+                    </div>
+                  </label>
+                </div>
 
                 <button
                   type="button"
                   onClick={() => void saveInterviewerSettings()}
                   disabled={savingInterviewerSettings}
-                  className="admin-btn-primary w-full px-5 py-3 disabled:opacity-60"
+                  className="admin-btn-primary h-9 px-4 text-xs disabled:opacity-60"
                 >
                   {savingInterviewerSettings ? (
                     "Saving…"
                   ) : (
                     <>
-                      <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden />
-                      Save interviewer settings
+                      <Check className="size-3.5" strokeWidth={2.5} aria-hidden />
+                      Save settings
                     </>
                   )}
                 </button>
               </div>
 
-              <div className="flex flex-col gap-6">
-                {(() => {
-                  const previewName =
-                    interviewerSettings.interviewerName.trim() || "Emma";
-                  const previewVoiceLabel =
-                    interviewerSettings.interviewerVoiceGender === "FEMALE"
-                      ? "Female (Marin)"
-                      : "Male (Cedar)";
-                  const previewAvatarLetter = previewName.charAt(0).toUpperCase();
-                  const previewGreeting = `Hello Drashti, it's great to meet you. I'm ${previewName} from ${authCompanyName}. To get us started, could you briefly introduce yourself...`;
-                  const waveformBars = [3, 5, 8, 6, 10, 7, 9, 5, 8, 6, 4, 7, 9, 5, 6, 8, 4, 7, 5, 3];
+              {(() => {
+                const previewName = interviewerSettings.interviewerName.trim() || "Emma";
+                const previewVoiceLabel =
+                  interviewerSettings.interviewerVoiceGender === "FEMALE"
+                    ? "Female voice"
+                    : "Male voice";
+                const previewAvatarLetter = previewName.charAt(0).toUpperCase();
+                const previewGreeting = `Hello Drashti, it's great to meet you. I'm ${previewName} from ${authCompanyName}. To get us started, could you briefly introduce yourself...`;
+                const waveformBars = [3, 5, 8, 6, 10, 7, 9, 5, 8, 6, 4, 7, 9, 5, 6, 8, 4, 7, 5, 3];
 
-                  return (
-                    <div
-                      className="admin-hero relative overflow-hidden rounded-2xl p-5 sm:p-6"
-                    >
-                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan">
-                        Live preview
-                      </p>
-                      <div className="mt-4 flex items-center gap-3">
-                        <div
-                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-primary-foreground"
-                          style={{ background: "var(--gradient-brand)" }}
-                          aria-hidden
-                        >
-                          {previewAvatarLetter}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-white">{previewName}</p>
-                          <p className="text-xs text-white/70">
-                            <span className="text-cyan">•</span> {previewVoiceLabel} - AI Interviewer
-                          </p>
-                        </div>
+                return (
+                  <div className="admin-hero relative overflow-hidden rounded-2xl p-4">
+                    <p className="text-cyan text-[10px] font-bold uppercase tracking-[0.2em]">
+                      Live preview
+                    </p>
+                    <div className="mt-3 flex items-center gap-3">
+                      <div
+                        className="flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-primary-foreground"
+                        style={{ background: "var(--gradient-brand)" }}
+                        aria-hidden
+                      >
+                        {previewAvatarLetter}
                       </div>
-                      <div className="mt-4 rounded-xl bg-black/25 p-4 ring-1 ring-white/10 backdrop-blur-sm">
-                        <p className="text-sm leading-relaxed text-white/90">{previewGreeting}</p>
-                      </div>
-                      <div className="mt-4 flex items-center gap-3">
-                        <button
-                          type="button"
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-slate-800 shadow-sm transition hover:bg-slate-100"
-                          aria-label="Play preview greeting"
-                        >
-                          <Play className="h-4 w-4 fill-slate-800 text-slate-800" aria-hidden />
-                        </button>
-                        <div className="flex min-w-0 flex-1 items-end gap-[3px] h-8" aria-hidden>
-                          {waveformBars.map((height, index) => (
-                            <div
-                              key={index}
-                              className="w-[3px] rounded-full bg-white/70"
-                              style={{ height: `${height * 3}px` }}
-                            />
-                          ))}
-                        </div>
-                        <span className="shrink-0 text-xs font-medium text-slate-400">0:04</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-foreground">{previewName}</p>
+                        <p className="text-muted-foreground text-xs">
+                          <span className="text-cyan">•</span> {previewVoiceLabel} interviewer
+                        </p>
                       </div>
                     </div>
-                  );
-                })()}
-
-                <div className="admin-card space-y-5 p-5 sm:p-6">
-                  <h4 className="admin-section-title text-base">How this is used</h4>
-                  <ul className="space-y-4">
-                    <li className="flex gap-3">
-                      <div
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyan/12 text-cyan ring-1 ring-cyan/25"
-                        aria-hidden
+                    <div className="bg-muted mt-3 rounded-xl p-3 ring-1 ring-border">
+                      <p className="text-sm leading-relaxed text-foreground">{previewGreeting}</p>
+                    </div>
+                    <div className="mt-3 flex items-center gap-3">
+                      <button
+                        type="button"
+                        className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-slate-800 shadow-sm"
+                        aria-label="Play preview greeting"
                       >
-                        <Clock className="h-4 w-4" strokeWidth={2.25} />
+                        <Play className="size-3.5 fill-slate-800 text-slate-800" aria-hidden />
+                      </button>
+                      <div className="flex h-7 min-w-0 flex-1 items-end gap-[3px]" aria-hidden>
+                        {waveformBars.map((height, index) => (
+                          <div
+                            key={index}
+                            className="bg-foreground/40 w-[3px] rounded-full"
+                            style={{ height: `${height * 2.5}px` }}
+                          />
+                        ))}
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Applies to all sessions</p>
-                        <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                          Every new interview across your {requirementsTotal} requirements uses this
-                          name and voice.
-                        </p>
-                      </div>
-                    </li>
-                    <li className="flex gap-3">
-                      <div
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet/12 text-violet ring-1 ring-violet/25"
-                        aria-hidden
-                      >
-                        <Layers className="h-4 w-4" strokeWidth={2.25} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">
-                          Consistent candidate experience
-                        </p>
-                        <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                          Candidates hear the same greeting style across roles, keeping tone
-                          predictable.
-                        </p>
-                      </div>
-                    </li>
-                    <li className="flex gap-3">
-                      <div
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-warning/12 text-warning ring-1 ring-warning/25"
-                        aria-hidden
-                      >
-                        <Zap className="h-4 w-4" strokeWidth={2.25} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Takes effect immediately</p>
-                        <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                          Sessions already in progress keep their original interviewer voice.
-                        </p>
-                      </div>
-                    </li>
-                  </ul>
-                </div>
-              </div>
+                      <span className="shrink-0 text-xs font-medium text-slate-400">0:04</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </section>
           ) : null}
 
@@ -3788,8 +3624,8 @@ export default function AdminPageClient() {
 
               <div className="flex flex-col gap-4">
                 <div className="admin-hero relative overflow-hidden rounded-2xl p-5 sm:p-6">
-                  <p className="text-sm leading-relaxed text-white/85">
-                    This passcode protects access to your entire Uhired tenant, including candidate
+                  <p className="text-muted-foreground text-sm leading-relaxed">
+                    This passcode protects access to your entire Uhired account, including candidate
                     data and scoring.
                   </p>
                   <ul className="mt-5 space-y-3">
@@ -3799,10 +3635,10 @@ export default function AdminPageClient() {
                       "Changing your password signs out other active sessions.",
                     ].map((tip) => (
                       <li key={tip} className="flex items-start gap-2.5">
-                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25">
+                        <span className="bg-muted ring-border mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ring-1">
                           <Check className="h-3 w-3 text-cyan" strokeWidth={3} aria-hidden />
                         </span>
-                        <span className="text-sm leading-relaxed text-white/90">{tip}</span>
+                        <span className="text-sm leading-relaxed text-foreground">{tip}</span>
                       </li>
                     ))}
                   </ul>
@@ -3819,7 +3655,7 @@ export default function AdminPageClient() {
                         <Clock className="h-4 w-4" strokeWidth={2.25} />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-foreground">Tenant since</p>
+                        <p className="text-sm font-semibold text-foreground">Account created</p>
                         <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
                           {companyCreatedAt
                             ? `Active on Uhired since ${formatTenantSince(companyCreatedAt)}`
@@ -3942,17 +3778,17 @@ export default function AdminPageClient() {
                     </label>
                     <label className="block space-y-2 sm:col-span-2">
                       <span className="admin-label !mb-0">Default interview language</span>
-                      <select
+                      <AppSelect
                         value={brandSettings.interviewLanguage}
-                        onChange={(e) =>
-                          setBrandSettings((prev) => ({ ...prev, interviewLanguage: e.target.value }))
+                        onValueChange={(value) =>
+                          setBrandSettings((prev) => ({ ...prev, interviewLanguage: value }))
                         }
-                        className="admin-input"
-                      >
-                        {INTERVIEW_LANGUAGES.map((lang) => (
-                          <option key={lang.code} value={lang.code}>{lang.label}</option>
-                        ))}
-                      </select>
+                        aria-label="Default interview language"
+                        options={INTERVIEW_LANGUAGES.map((lang) => ({
+                          value: lang.code,
+                          label: lang.label,
+                        }))}
+                      />
                     </label>
                   </div>
                 </div>
@@ -4065,8 +3901,8 @@ export default function AdminPageClient() {
 
               <div className="flex flex-col gap-4">
                 <div className="admin-hero relative overflow-hidden rounded-2xl p-5 sm:p-6">
-                  <span className="inline-block rounded-md bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan ring-1 ring-white/20">
-                    Tenant summary
+                  <span className="bg-muted text-muted-foreground ring-border inline-block rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] ring-1">
+                    Company account
                   </span>
                   <div className="mt-4 flex items-center gap-3">
                     <div
@@ -4077,25 +3913,25 @@ export default function AdminPageClient() {
                       {authCompanyName.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-bold text-white">{authCompanyName}</p>
-                      <p className="truncate text-xs text-white/70">{authAdminEmail || "—"}</p>
+                      <p className="font-bold text-foreground">{authCompanyName}</p>
+                      <p className="text-muted-foreground truncate text-xs">{authAdminEmail || "—"}</p>
                     </div>
                   </div>
                   <dl className="mt-5 space-y-2.5">
                     {[
                       { label: "Interview sessions", value: sessionsTotal },
                       { label: "Candidates", value: candidateMetrics.total },
-                      { label: "Requirements", value: requirementsTotal },
+                      { label: "Job openings", value: requirementsTotal },
                     ].map((row) => (
                       <div key={row.label} className="flex items-center justify-between gap-3 text-sm">
-                        <dt className="text-white/65">{row.label}</dt>
-                        <dd className="font-semibold text-white">{row.value}</dd>
+                        <dt className="text-muted-foreground">{row.label}</dt>
+                        <dd className="font-semibold text-foreground">{row.value}</dd>
                       </div>
                     ))}
                   </dl>
-                  <div className="mt-5 flex items-center justify-between border-t border-white/15 pt-4 text-sm">
-                    <span className="text-white/65">Plan</span>
-                    <span className="font-semibold text-white">Tenant Admin</span>
+                  <div className="mt-5 flex items-center justify-between border-t border-border pt-4 text-sm">
+                    <span className="text-muted-foreground">Role</span>
+                    <span className="font-semibold text-foreground">Company Admin</span>
                   </div>
                 </div>
 
@@ -4330,6 +4166,36 @@ export default function AdminPageClient() {
                         {loadingSupportTickets ? "Refreshing…" : "Refresh"}
                       </button>
                     </div>
+                    {supportTickets.length > 0 ? (
+                      <div className="mb-3 flex flex-wrap items-center gap-2">
+                        <div className="relative min-w-[12rem] flex-1">
+                          <Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2" />
+                          <input
+                            value={supportTicketSearch}
+                            onChange={(event) => setSupportTicketSearch(event.target.value)}
+                            placeholder="Search tickets"
+                            className="border-input bg-background h-8 w-full rounded-md border pr-3 pl-8 text-sm outline-none"
+                            aria-label="Search support tickets"
+                          />
+                        </div>
+                        <AppSelect
+                          value={supportTicketStatus}
+                          onValueChange={(value) =>
+                            setSupportTicketStatus(value as typeof supportTicketStatus)
+                          }
+                          size="sm"
+                          className="w-[9.5rem]"
+                          aria-label="Filter tickets by status"
+                          options={[
+                            { value: "ALL", label: "All status" },
+                            { value: "NEW", label: "New" },
+                            { value: "READ", label: "Read" },
+                            { value: "REPLIED", label: "Replied" },
+                            { value: "ARCHIVED", label: "Archived" },
+                          ]}
+                        />
+                      </div>
+                    ) : null}
                     {loadingSupportTickets && supportTickets.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Loading tickets…</p>
                     ) : supportTickets.length === 0 ? (
@@ -4340,9 +4206,11 @@ export default function AdminPageClient() {
                           Submit a message above and it will appear here.
                         </p>
                       </div>
+                    ) : filteredSupportTickets.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No tickets match these filters.</p>
                     ) : (
                       <ul className="space-y-3">
-                        {supportTickets.map((ticket) => {
+                        {filteredSupportTickets.map((ticket) => {
                           const statusStyles: Record<SupportTicket["status"], string> = {
                             NEW: "bg-warning/12 text-warning ring-warning/25",
                             READ: "bg-primary/12 text-primary ring-primary/25",
@@ -4381,34 +4249,34 @@ export default function AdminPageClient() {
 
                 <div className="flex flex-col gap-4">
                   <div className="admin-hero relative overflow-hidden rounded-2xl p-5 sm:p-6">
-                    <span className="inline-block rounded-md bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan ring-1 ring-white/20">
+                    <span className="bg-muted text-muted-foreground ring-border inline-block rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] ring-1">
                       Expected response
                     </span>
-                    <p className="mt-4 text-2xl font-black tracking-tight text-white">Within 24 hours</p>
-                    <p className="mt-2 text-sm leading-relaxed text-white/80">
+                    <p className="mt-4 text-2xl font-semibold tracking-tight text-foreground">Within 24 hours</p>
+                    <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
                       Our team reviews every ticket manually — priority given to invite delivery and scoring
                       issues.
                     </p>
                     <div className="mt-5 space-y-2">
                       <a
                         href="mailto:support@uhired.in"
-                        className="flex items-center gap-3 rounded-xl bg-white/5 p-3 ring-1 ring-white/10 transition hover:bg-white/10 no-underline"
+                        className="hover:bg-muted flex items-center gap-3 rounded-xl bg-muted/60 p-3 ring-1 ring-border no-underline transition"
                       >
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10">
+                        <div className="bg-background flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-border">
                           <Mail className="h-4 w-4 text-cyan" aria-hidden />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-white">Email support</p>
-                          <p className="text-[11px] text-white/70">support@uhired.in</p>
+                          <p className="text-xs font-semibold text-foreground">Email support</p>
+                          <p className="text-muted-foreground text-[11px]">support@uhired.in</p>
                         </div>
                       </a>
-                      <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10">
+                      <div className="flex items-center gap-3 rounded-xl bg-muted/60 p-3 ring-1 ring-border">
+                        <div className="bg-background flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-border">
                           <MessageCircle className="h-4 w-4 text-cyan" aria-hidden />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-white">Live chat</p>
-                          <p className="text-[11px] text-white/70">Mon–Fri, 9am–6pm IST</p>
+                          <p className="text-xs font-semibold text-foreground">Live chat</p>
+                          <p className="text-muted-foreground text-[11px]">Mon–Fri, 9am–6pm IST</p>
                         </div>
                       </div>
                     </div>
@@ -4436,7 +4304,7 @@ export default function AdminPageClient() {
                         {
                           id: "invite-email",
                           question: "Why didn't my invite email arrive?",
-                          answer: `${SPAM_FOLDER_NOTE} Invites also expire — check the invite status in Requirements and resend if needed.`,
+                          answer: `${SPAM_FOLDER_NOTE} Invites also expire — check the invite status in Job Openings and resend if needed.`,
                         },
                         {
                           id: "match-score",
@@ -4475,416 +4343,364 @@ export default function AdminPageClient() {
           ) : null}
 
           {activeSection === "requirements" ? (
-            <section className="space-y-5">
-              <div>
-                <h3 className="admin-section-title">Requirements</h3>
-                <p className="mt-1 text-sm text-slate-500">Browse and manage interview requirements</p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="admin-card flex items-start justify-between gap-3 p-5">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                      Total requirements
-                    </p>
-                    <p className="mt-2 text-3xl font-black tracking-tight text-[#0f172a]">
-                      {requirementsTotal}
-                    </p>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50">
-                    <FileText className="h-5 w-5 text-violet-600" />
-                  </div>
-                </div>
-                <div className="admin-card flex items-start justify-between gap-3 p-5">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                      Invites used
-                    </p>
-                    <p className="mt-2 text-3xl font-black tracking-tight text-[#0f172a]">
-                      {requirementInviteStats.used}
-                    </p>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                  </div>
-                </div>
-                <div className="admin-card flex items-start justify-between gap-3 p-5">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                      Invites sent
-                    </p>
-                    <p className="mt-2 text-3xl font-black tracking-tight text-[#0f172a]">
-                      {requirementInviteStats.sent}
-                    </p>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
-                    <Mail className="h-5 w-5 text-blue-600" />
-                  </div>
-                </div>
-                <div className="admin-card flex items-start justify-between gap-3 p-5">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                      Expired invites
-                    </p>
-                    <p className="mt-2 text-3xl font-black tracking-tight text-[#0f172a]">
-                      {requirementInviteStats.expired}
-                    </p>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
-                    <Clock className="h-5 w-5 text-amber-600" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={requirementSearch}
-                  onChange={(e) => setRequirementSearch(e.target.value)}
-                  placeholder="Search by role, domain, or topic..."
-                  className="admin-input w-full pl-9"
-                />
-              </div>
-
-              <div className="grid gap-4">
-                {loadingRequirements ? (
-                  <p className="text-sm text-slate-500">Loading requirements...</p>
-                ) : null}
-                {requirements.map((requirement) => {
-                  const roleTitle = requirement.title ?? requirement.domain;
-                  return (
-                    <div key={requirement.requirementId} className="admin-card p-5">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="flex min-w-0 items-start gap-3">
-                          <div
-                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xs font-black ${roleAvatarColor(
-                              requirement.title,
-                              requirement.domain,
-                            )}`}
-                          >
-                            {getRoleInitials(requirement.title, requirement.domain)}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-bold text-[#1a3352]">
-                              {roleTitle}
-                              <span className="font-semibold text-slate-500"> · {requirement.durationMin} min</span>
-                            </p>
-                            <p className="mt-0.5 text-xs text-slate-500">
-                              Mandatory {requirement.mandatoryQuestions.length} · Optional{" "}
-                              {requirement.optionalQuestions.length} (max {requirement.maxOptionalQuestions}) · Used
-                              in {requirement.sessionsCount} submissions
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setRequirementViewer(requirement)}
-                            className="admin-btn-ghost"
-                          >
-                            View
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditor({ kind: "requirement", recordId: requirement.requirementId })}
-                            className="admin-btn-primary px-3 py-1.5 text-xs disabled:opacity-40"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void deleteRequirement(requirement.requirementId)}
-                            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-
-                      {requirement.candidateInvites?.length ? (
-                        <div className="mt-4 space-y-2">
-                          {requirement.candidateInvites.map((invite) => {
-                            const status = getInviteStatus(invite);
-                            const styles = inviteStatusStyles(status);
-                            return (
-                              <div
-                                key={`${invite.email}-${invite.accessCode}`}
-                                className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50/90 px-4 py-3 ring-1 ring-slate-100"
-                              >
-                                <span className={`h-2 w-2 shrink-0 rounded-full ${styles.dot}`} />
-                                <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700">
-                                  {invite.email}
-                                </span>
-                                <code className="admin-code-badge admin-code-badge-sm shrink-0">
-                                  {invite.accessCode}
-                                </code>
-                                <span
-                                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${styles.chip}`}
-                                >
-                                  {status}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : requirement.requirementAccessCode ? (
-                        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50/90 px-4 py-3 ring-1 ring-slate-100">
-                          <span className="text-xs font-semibold text-slate-500">Legacy shared code:</span>
-                          <code className="admin-code-badge admin-code-badge-sm">
-                            {requirement.requirementAccessCode}
-                          </code>
-                        </div>
-                      ) : (
-                        <p className="mt-4 text-xs font-medium text-slate-500">No candidate invites yet</p>
-                      )}
-                    </div>
-                  );
-                })}
-                {!loadingRequirements && !requirements.length ? (
-                  <p className="admin-card p-5 text-sm text-slate-500">
-                    No requirement snapshots found yet.
-                  </p>
-                ) : null}
-              </div>
-              {requirementsTotal > 0 ? (
-                <div className="admin-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-slate-600">
-                    Showing {requirementPageStart}–{requirementPageEnd} of {requirementsTotal} requirements
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={requirementPage <= 1}
-                      onClick={() => setRequirementPage((p) => Math.max(1, p - 1))}
-                      className="admin-btn-ghost disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Previous
-                    </button>
-                    <span className="px-2 text-sm text-slate-600">
-                      Page {requirementPage} of {requirementsTotalPages}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={requirementPage >= requirementsTotalPages}
-                      onClick={() => setRequirementPage((p) => Math.min(requirementsTotalPages, p + 1))}
-                      className="admin-btn-ghost disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-
-          {activeSection === "overview" ? (
-            <>
-          {/* Welcome + utilization */}
-          <section className="grid gap-5 md:grid-cols-3">
-            <div className="admin-hero relative overflow-hidden rounded-2xl p-8 text-white md:col-span-2 md:p-10">
-              <div className="relative z-10 max-w-lg">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-400">Overview</p>
-                <h2 className="mt-2 text-3xl font-extrabold leading-tight tracking-tight md:text-[2rem]">
-                  Welcome back,
-                  <br />
-                  {authCompanyName} Admin.
-                </h2>
-                <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300">
-                  You have <span className="font-semibold text-white">{summary.open} open sessions</span>,{" "}
-                  <span className="font-semibold text-white">{summary.completed} completed</span>. Ready to
-                  generate some insight?
+            <section className="space-y-3">
+              <div className="rounded-xl border border-border bg-muted/20 px-4 py-3">
+                <p className="text-sm font-semibold text-foreground">Saved openings are reusable hiring templates.</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Use Invites when you want to send a new batch of candidate emails. Use this page to reuse, review,
+                  and manage saved openings and their interviews.
                 </p>
               </div>
-              <div className="pointer-events-none absolute -right-4 -top-6 flex h-52 w-52 items-center justify-center rounded-full border border-white/10 bg-white/5">
-                <Compass className="h-28 w-28 text-white/15" strokeWidth={1} />
-              </div>
-            </div>
-            <div className="admin-card glow-card flex flex-col justify-between p-6 md:p-7">
-              <div>
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success/12 text-success ring-1 ring-success/25">
-                    <Zap className="h-4 w-4" />
-                  </div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-success">Active now</p>
-                </div>
-                <p className="mt-3 text-4xl font-black tracking-tight text-foreground">{utilizationRate}%</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {dashboardData?.invites.sent
-                    ? "Invite conversion rate (used ÷ sent)"
-                    : "Session completion rate"}
-                </p>
-              </div>
-              <div className="mt-6 h-2 w-full overflow-hidden rounded-full bg-surface/80 ring-1 ring-border">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-primary transition-all duration-500"
-                  style={{ width: `${utilizationRate}%` }}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* Interview requirements + candidate invites */}
-          {(loadingOverviewRequirements || overviewRequirements.length > 0) ? (
-            <section className="admin-card glow-card p-4 md:p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                    Reuse setup
-                  </p>
-                  <h3 className="mt-1 text-sm font-bold text-foreground">Previous requirements</h3>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Click a saved requirement to autofill — then add emails and send interview codes.
-                  </p>
-                </div>
-                {selectedRequirementId ? (
+              <div className="bg-muted/40 flex rounded-lg border p-0.5">
+                {(
+                  [
+                    { key: "openings", label: "Saved openings", count: requirementsTotal },
+                    { key: "sessions", label: "Interviews for openings", count: sessionStatusCounts.total },
+                  ] as const
+                ).map((tab) => (
                   <button
+                    key={tab.key}
                     type="button"
-                    onClick={clearSelectedRequirement}
-                    className="admin-btn-ghost inline-flex items-center gap-1.5 !px-3 !py-1.5 !text-xs"
+                    onClick={() => setOpeningTab(tab.key)}
+                    className={`inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium ${
+                      openingTab === tab.key
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
                   >
-                    <PlusCircle className="h-3.5 w-3.5" />
-                    New requirement
+                    {tab.label}
+                    <span className="tabular-nums opacity-70">{tab.count}</span>
                   </button>
-                ) : null}
+                ))}
               </div>
 
-              {loadingOverviewRequirements && overviewRequirements.length === 0 ? (
-                <p className="mt-4 text-xs text-muted-foreground">Loading previous requirements…</p>
+              {openingTab === "openings" ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                    {[
+                      { label: "Saved openings", value: requirementsTotal },
+                      { label: "Invites used", value: requirementInviteStats.used },
+                      { label: "Invites sent", value: requirementInviteStats.sent },
+                      { label: "Expired", value: requirementInviteStats.expired },
+                    ].map((stat) => (
+                      <div key={stat.label} className="admin-card flex items-center justify-between gap-2 px-3 py-2">
+                        <p className="text-muted-foreground text-xs">{stat.label}</p>
+                        <p className="text-sm font-semibold tabular-nums">{stat.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <AdminRequirementsTable
+                    requirements={requirements}
+                    loading={loadingRequirements}
+                    search={requirementSearch}
+                    onSearchChange={setRequirementSearch}
+                    page={requirementPage}
+                    totalPages={requirementsTotalPages}
+                    pageStart={requirementPageStart}
+                    pageEnd={requirementPageEnd}
+                    totalItems={requirementsTotal}
+                    onPageChange={setRequirementPage}
+                    onView={(requirement) => {
+                      setDetailSession(null);
+                      setCandidateViewer(null);
+                      setRequirementViewer(requirement);
+                    }}
+                    onEdit={(requirementId) => {
+                      setRequirementViewer(null);
+                      setDetailSession(null);
+                      setCandidateViewer(null);
+                      setEditor({ kind: "requirement", recordId: requirementId });
+                    }}
+                    onDelete={(requirementId) => void deleteRequirement(requirementId)}
+                    onInvite={(requirement) => {
+                      setActiveSection("overview");
+                      applyRequirementToForm(requirement);
+                    }}
+                    onCopyCode={(code) => void copyCode(code, "Opening code copied.")}
+                    onCopyShareLink={(requirement) => void copyOpeningShareLink(requirement)}
+                    onOpenSessions={(requirement) => {
+                      const role = requirement.title?.trim() || requirement.domain;
+                      setSessionSearch(role);
+                      setSessionStatusFilter("ALL");
+                      setSessionRecordingFilter("all");
+                      setSessionQuickView("all");
+                      setSessionPage(1);
+                      setOpeningTab("sessions");
+                    }}
+                  />
+                </>
               ) : (
                 <>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                    {visibleOverviewRequirements.map((requirement) => {
-                      const isSelected = selectedRequirementId === requirement.requirementId;
-                      const inviteCount = requirement.candidateInvites?.length ?? 0;
-                      return (
-                        <button
-                          key={requirement.requirementId}
-                          type="button"
-                          onClick={() => applyRequirementToForm(requirement)}
-                          className={`group rounded-xl border px-3 py-2.5 text-left transition-all ${
-                            isSelected
-                              ? "border-primary/40 bg-primary/10 ring-1 ring-primary/25 shadow-sm"
-                              : "border-border bg-surface/40 hover:border-primary/25 hover:bg-surface/60"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-xs font-semibold leading-snug text-foreground line-clamp-2">
-                              {requirement.title ?? requirement.domain}
-                            </p>
-                            {isSelected ? (
-                              <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-                            ) : null}
-                          </div>
-                          <p className="mt-1 text-[10px] font-medium text-muted-foreground">
-                            {requirement.durationMin} min · {formatRequirementRelativeDate(requirement.createdAt)}
-                          </p>
-                          <p className="mt-1 text-[10px] text-muted-foreground/80">
-                            {inviteCount} invite{inviteCount === 1 ? "" : "s"} · {requirement.sessionsCount} interview
-                            {requirement.sessionsCount === 1 ? "" : "s"}
-                          </p>
-                        </button>
-                      );
-                    })}
+                  <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                    {[
+                      { label: "Sessions", value: sessionStatusCounts.total },
+                      { label: "Completed", value: sessionStatusCounts.completed },
+                      { label: "Ready", value: sessionStatusCounts.ready },
+                      { label: "Live", value: sessionStatusCounts.live },
+                    ].map((stat) => (
+                      <div key={stat.label} className="admin-card flex items-center justify-between gap-2 px-3 py-2">
+                        <p className="text-muted-foreground text-xs">{stat.label}</p>
+                        <p className="text-sm font-semibold tabular-nums">{stat.value}</p>
+                      </div>
+                    ))}
                   </div>
-                  {hiddenOverviewRequirementsCount > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => setPreviousRequirementsExpanded((open) => !open)}
-                      className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:opacity-90"
-                    >
-                      <ChevronDown
-                        className={`h-3.5 w-3.5 transition-transform ${previousRequirementsExpanded ? "rotate-180" : ""}`}
-                      />
-                      {previousRequirementsExpanded
-                        ? "Show less"
-                        : `See more (${hiddenOverviewRequirementsCount} more)`}
-                    </button>
-                  ) : null}
+
+                  <AdminSessionsTable
+                    sessions={displayedSessions}
+                    loading={loadingSessions}
+                    search={sessionSearch}
+                    onSearchChange={(value) => {
+                      setSessionSearch(value);
+                      setSessionQuickView("all");
+                    }}
+                    status={sessionStatusFilter}
+                    onStatusChange={(value) => {
+                      setSessionStatusFilter(value);
+                      if (value === "COMPLETED") setSessionQuickView("completed");
+                      else if (value === "READY") setSessionQuickView("ready");
+                      else setSessionQuickView("all");
+                    }}
+                    recording={sessionRecordingFilter}
+                    onRecordingChange={(value) => {
+                      setSessionRecordingFilter(value);
+                      setSessionQuickView(value === "no_recording" ? "no_recording" : "all");
+                    }}
+                    scoreMin={sessionScoreMin}
+                    scoreMax={sessionScoreMax}
+                    onScoreMinChange={setSessionScoreMin}
+                    onScoreMaxChange={setSessionScoreMax}
+                    from={sessionFrom}
+                    to={sessionTo}
+                    onFromChange={setSessionFrom}
+                    onToChange={setSessionTo}
+                    onReset={resetSessionFilters}
+                    selectedIds={selectedSessionIds}
+                    onToggle={toggleSelectedSession}
+                    onTogglePage={setAllVisibleSessionsSelected}
+                    page={sessionPage}
+                    totalPages={sessionsTotalPages}
+                    pageStart={sessionPageStart}
+                    pageEnd={sessionPageEnd}
+                    totalItems={sessionsTotal}
+                    onPageChange={setSessionPage}
+                    onView={(sessionId) => void openSessionDetail(sessionId)}
+                    onEdit={(sessionId) => void openSessionEditor(sessionId)}
+                    onDelete={(sessionId) => void deleteSessionSubmission(sessionId)}
+                    onExportSelected={() => void exportSelectedSessionsCsv()}
+                    onExportAll={() => void exportAllFilteredSessionsCsv()}
+                    onBulkDelete={() => void bulkDeleteSelectedSessions()}
+                    exportBusy={bulkExportBusy}
+                    deleteBusy={bulkDeleteBusy}
+                    formatCode={formatSessionInviteCode}
+                  />
                 </>
               )}
             </section>
           ) : null}
 
-          <section ref={draftSectionRef} className="grid gap-8 lg:grid-cols-12">
+          {activeSection === "overview" ? (
+            <div className="admin-invites space-y-3">
+          <div className="rounded-xl border border-primary/20 bg-primary/6 px-4 py-3">
+            <p className="text-sm font-semibold text-foreground">Use this page when you are ready to invite candidates.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Start from scratch or load a saved opening, then send emails from here.
+            </p>
+          </div>
+          <section className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+            {[
+              {
+                label: "Active interviews",
+                value: summary.open,
+                hint: summary.open > 0 ? "Need attention" : "None waiting",
+                icon: PlayCircle,
+                hot: summary.open > 0,
+                onClick: () => goToOpening("sessions"),
+              },
+              {
+                label: "Completed",
+                value: summary.completed,
+                hint: "Completed interviews",
+                icon: CheckCircle2,
+                hot: false,
+                onClick: () => goToOpening("sessions"),
+              },
+              {
+                label: "Invites sent",
+                value: invitesSentCount,
+                hint: "Emails delivered to candidates",
+                icon: Mail,
+                hot: false,
+                onClick: undefined,
+              },
+              {
+                label: "Attended",
+                value: `${startedRate}%`,
+                hint:
+                  invitesSentCount > 0
+                    ? "joined the interview"
+                    : "No invites sent yet",
+                icon: Zap,
+                hot: startedRate >= 40,
+                onClick: () => goToOpening("sessions"),
+              },
+            ].map((stat) => {
+              const Icon = stat.icon;
+              const Tag = stat.onClick ? "button" : "div";
+              return (
+                <Tag
+                  key={stat.label}
+                  type={stat.onClick ? "button" : undefined}
+                  onClick={stat.onClick}
+                  className={`admin-card admin-kpi ${stat.hot ? "admin-kpi-hot" : ""} ${stat.onClick ? "cursor-pointer" : ""}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wide">
+                      {stat.label}
+                    </p>
+                    <Icon className={`size-3.5 ${stat.hot ? "text-primary" : "text-muted-foreground"}`} />
+                  </div>
+                  <p className="text-foreground text-xl font-semibold tabular-nums tracking-tight">
+                    {stat.value}
+                  </p>
+                  <p className={`text-[11px] ${stat.hot ? "text-primary font-medium" : "text-muted-foreground"}`}>
+                    {stat.hint}
+                  </p>
+                </Tag>
+              );
+            })}
+          </section>
+
+          <section ref={draftSectionRef} className="grid items-start gap-3 lg:grid-cols-12">
             <form
               ref={formRef}
               id="admin-session-form"
               onSubmit={handleGenerate}
-              className="space-y-6 lg:col-span-8"
+              className="lg:col-span-8"
             >
-              <div className="admin-card glow-card p-6 md:p-8">
-                <div className="mb-8 flex flex-wrap items-start justify-between gap-4 border-b border-border pb-6">
+              <div className="admin-card p-4 sm:p-5">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
                   <div>
-                    <h3 className="admin-section-title">Interview Requirements</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <h3 className="admin-section-title">Interview opening</h3>
+                    <p className="text-muted-foreground mt-0.5 text-xs">
                       {selectedRequirementId
-                        ? "Reusing a saved requirement — add emails on the right to send more invites"
-                        : "Configure role details for the AI interview session"}
+                        ? "Saved opening loaded — add candidate emails on the right"
+                        : "Set role, JD, and interview settings"}
                     </p>
                   </div>
                   <span className="admin-badge shrink-0">
-                    {selectedRequirementId ? "Reusing saved" : "Drafting Session"}
+                    {selectedRequirementId ? "Saved opening" : "New opening"}
                   </span>
                 </div>
 
-                {selectedRequirementId ? (
-                  <div className="mb-6 rounded-xl border border-success/25 bg-success/10 px-4 py-3">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-success">
-                      Active requirement
-                    </p>
-                    <p className="mt-1 text-sm font-bold text-foreground">{targetRole}</p>
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      Same questions and settings as before. Add candidate emails and send — each gets a unique interview
-                      code by email.
-                    </p>
-                  </div>
-                ) : null}
-
-                <div className="space-y-8">
-                  <section className="space-y-4">
-                    <div className="flex gap-3">
+                <div className="space-y-4">
+                  <section className="space-y-3">
+                    <div className="flex items-center gap-2">
                       <span className="admin-overview-step-num">1</span>
-                      <div>
-                        <h4 className="admin-form-group-title">Organization Details</h4>
-                        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                          Company and role you are hiring for
-                        </p>
-                      </div>
+                      <h4 className="admin-form-group-title text-sm">Company and role</h4>
                     </div>
-                    <div className="admin-form-group space-y-5">
+                    <div className="grid gap-3 sm:grid-cols-2">
                       <div>
-                        <label className="admin-label">Organization name</label>
+                        <label className="admin-label">Company</label>
                         <div className="admin-input-readonly">{authCompanyName}</div>
-                        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                          Fixed to your current company session. Switch company is disabled for security.
-                        </p>
                       </div>
                       <div>
-                        <label className="admin-label">
-                          Target role <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          name="positionTitle"
-                          value={targetRole}
-                          onChange={(e) => setTargetRole(e.target.value)}
-                          placeholder="e.g. Senior Product Designer, HR Manager, Civil Engineer"
-                          className="admin-input"
-                        />
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <label className="admin-label mb-0">
+                            Target role <span className="text-red-500">*</span>
+                          </label>
+                          {selectedRequirementId ? (
+                            <button
+                              type="button"
+                              onClick={clearSelectedRequirement}
+                              className="text-primary text-[11px] font-medium"
+                            >
+                              New role
+                            </button>
+                          ) : null}
+                        </div>
+                        <div ref={roleFieldRef} className="relative">
+                          <input
+                            name="positionTitle"
+                            value={targetRole}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setTargetRole(value);
+                              setRoleMenuOpen(true);
+                              if (selectedRequirementId) {
+                                const selected = overviewRequirements.find(
+                                  (row) => row.requirementId === selectedRequirementId,
+                                );
+                                const selectedLabel = selected?.title?.trim() || selected?.domain || "";
+                                if (value.trim() !== selectedLabel) setSelectedRequirementId(null);
+                              }
+                            }}
+                            onFocus={() => setRoleMenuOpen(true)}
+                            placeholder="Type a role or pick a previous one"
+                            className={`admin-input pr-9 ${targetRole.trim() ? "" : "admin-input-needed"}`}
+                            autoComplete="off"
+                            aria-expanded={roleMenuOpen}
+                            aria-controls="previous-role-list"
+                          />
+                          <button
+                            type="button"
+                            className="text-muted-foreground absolute inset-y-0 right-0 flex w-9 items-center justify-center"
+                            onClick={() => setRoleMenuOpen((open) => !open)}
+                            aria-label="Show previous roles"
+                          >
+                            <ChevronDown className={`h-4 w-4 transition-transform ${roleMenuOpen ? "rotate-180" : ""}`} />
+                          </button>
+                          {roleMenuOpen ? (
+                            <div
+                              id="previous-role-list"
+                              className="border-border bg-card absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border shadow-md"
+                            >
+                              {loadingOverviewRequirements && overviewRequirements.length === 0 ? (
+                                <p className="text-muted-foreground px-3 py-2 text-xs">Loading previous roles…</p>
+                              ) : previousRoleOptions.length === 0 ? (
+                                <p className="text-muted-foreground px-3 py-2 text-xs">
+                                  {overviewRequirements.length === 0
+                                    ? "No previous roles yet. Type a new one."
+                                    : "No matching previous role."}
+                                </p>
+                              ) : (
+                                previousRoleOptions.map(({ requirement, label }) => {
+                                  const isSelected = selectedRequirementId === requirement.requirementId;
+                                  const inviteCount = requirement.candidateInvites?.length ?? 0;
+                                  return (
+                                    <button
+                                      key={requirement.requirementId}
+                                      type="button"
+                                      onClick={() => applyRequirementToForm(requirement)}
+                                      className={`flex w-full items-start justify-between gap-2 px-3 py-2 text-left hover:bg-muted ${
+                                        isSelected ? "bg-muted" : ""
+                                      }`}
+                                    >
+                                      <span className="min-w-0">
+                                        <span className="block truncate text-xs font-semibold">{label}</span>
+                                        <span className="text-muted-foreground block text-[11px]">
+                                          {requirement.durationMin}m · {inviteCount} invite
+                                          {inviteCount === 1 ? "" : "s"}
+                                        </span>
+                                      </span>
+                                      {isSelected ? <Check className="text-primary mt-0.5 h-3.5 w-3.5 shrink-0" /> : null}
+                                    </button>
+                                  );
+                                })
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   </section>
 
-                  <section className="space-y-4">
-                    <div className="flex gap-3">
+                  <section className="space-y-3 border-t border-border pt-4">
+                    <div className="flex items-center gap-2">
                       <span className="admin-overview-step-num">2</span>
-                      <div>
-                        <h4 className="admin-form-group-title">Job Details</h4>
-                        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                          Description and skills the AI interviewer will assess
-                        </p>
-                      </div>
+                      <h4 className="admin-form-group-title text-sm">Job details</h4>
                     </div>
-                    <div className="admin-form-group space-y-5">
+                    <div className="space-y-3">
                       <div>
                         <label className="admin-label">
                           Job description <span className="text-red-500">*</span>
@@ -4895,7 +4711,7 @@ export default function AdminPageClient() {
                           value={jobDescription}
                           onChange={(e) => setJobDescription(e.target.value)}
                           placeholder="Paste the full job description here..."
-                          className="admin-input min-h-[7rem] resize-y"
+                          className={`admin-input min-h-[5.5rem] resize-y ${jobDescription.trim() ? "" : "admin-input-needed"}`}
                         />
                       </div>
 
@@ -4917,7 +4733,7 @@ export default function AdminPageClient() {
                           </button>
                         </span>
                       ))}
-                      <span className="flex items-center gap-2">
+                      <span className="flex min-w-[14rem] flex-1 items-center gap-2">
                         <input
                           value={skillInput}
                           onChange={(e) => setSkillInput(e.target.value)}
@@ -4928,20 +4744,21 @@ export default function AdminPageClient() {
                             }
                           }}
                           placeholder="Add skill"
-                          className="w-36 rounded-full border border-border bg-surface/40 px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className={`admin-input min-w-0 flex-1 ${
+                            skills.length ? "" : "admin-input-needed"
+                          }`}
                         />
                         <button
                           type="button"
                           onClick={addSkill}
-                          className="rounded-lg px-3 py-1.5 text-xs font-bold text-primary-foreground transition hover:opacity-90"
-                          style={{ background: "var(--gradient-brand)" }}
+                          className="admin-btn-primary h-10 shrink-0 px-3 text-xs"
                         >
                           Add +
                         </button>
                       </span>
                     </div>
                     {debouncedTargetRole && pendingSuggestedSkills.length > 0 ? (
-                      <div className="mt-3 rounded-lg border border-primary/20 bg-primary/8 p-3">
+                      <div className="mt-2 rounded-lg border border-primary/20 bg-primary/8 p-2.5">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-primary">
                             Suggested for {roleSkillSuggestions.roleLabel || debouncedTargetRole}
@@ -4977,29 +4794,25 @@ export default function AdminPageClient() {
                     </div>
                   </section>
 
-                  <section className="space-y-4">
-                    <div className="flex gap-3">
+                  <section className="space-y-3 border-t border-border pt-4">
+                    <div className="flex items-center gap-2">
                       <span className="admin-overview-step-num">3</span>
-                      <div>
-                        <h4 className="admin-form-group-title">Interview Configuration</h4>
-                        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                          Duration and questions for the AI interview session
-                        </p>
-                      </div>
+                      <h4 className="admin-form-group-title text-sm">Interview setup</h4>
                     </div>
-                    <div className="admin-form-group space-y-5">
+                    <div className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="admin-label">Interview duration</label>
-                    <div className="flex gap-2">
+                    <label className="admin-label">Duration</label>
+                    <div className="admin-duration-row">
                       {[5, 10, 30, 60].map((m) => (
                         <button
                           key={m}
                           type="button"
                           onClick={() => setDurationMin(m)}
-                          className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition-all ${
+                          className={`admin-duration-pill ${
                             durationMin === m
-                              ? "text-primary-foreground shadow-[var(--shadow-glow)]"
-                              : "bg-surface/60 text-muted-foreground ring-1 ring-border hover:text-foreground"
+                              ? "text-primary-foreground"
+                              : "bg-muted text-muted-foreground hover:text-foreground"
                           }`}
                           style={
                             durationMin === m ? { background: "var(--gradient-brand)" } : undefined
@@ -5008,11 +4821,6 @@ export default function AdminPageClient() {
                           {m}m
                         </button>
                       ))}
-                    </div>
-                    <div className="mt-4">
-                      <label htmlFor="customDurationMin" className="admin-label">
-                        Custom duration (10-120 minutes)
-                      </label>
                       <input
                         id="customDurationMin"
                         type="number"
@@ -5021,7 +4829,9 @@ export default function AdminPageClient() {
                         step={1}
                         value={durationMin}
                         onChange={(event) => updateDuration(event.target.value)}
-                        className="admin-input"
+                        className="admin-input admin-duration-custom"
+                        aria-label="Custom duration in minutes"
+                        title="Custom minutes (5–120)"
                       />
                     </div>
                     <input type="hidden" name="durationMin" value={durationMin} readOnly />
@@ -5029,31 +4839,29 @@ export default function AdminPageClient() {
 
                   <div>
                     <label className="admin-label" htmlFor="requirementInterviewLanguage">
-                      Interview language
+                      Language
                     </label>
-                    <select
-                      id="requirementInterviewLanguage"
+                    <AppSelect
                       value={requirementInterviewLanguage}
-                      onChange={(e) => setRequirementInterviewLanguage(e.target.value)}
-                      className="admin-input py-2 text-sm"
-                    >
-                      {INTERVIEW_LANGUAGES.map((lang) => (
-                        <option key={lang.code} value={lang.code}>{lang.label}</option>
-                      ))}
-                    </select>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      AI interviewer will conduct the session in this language.
-                    </p>
+                      onValueChange={setRequirementInterviewLanguage}
+                      aria-label="Interview language"
+                      options={INTERVIEW_LANGUAGES.map((lang) => ({
+                        value: lang.code,
+                        label: lang.label,
+                      }))}
+                    />
+                  </div>
                   </div>
 
+                  <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                       <label className="admin-label mb-0">Mandatory questions</label>
                       <button
                         type="button"
                         onClick={() => void handleGenerateQuestionsFromJd()}
                         disabled={generateQuestionsBusy || !isRequirementFormValid}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500 px-2.5 py-1 text-[11px] font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Zap className="h-3.5 w-3.5" />
                         {generateQuestionsBusy ? "Generating…" : "Generate from JD"}
@@ -5062,12 +4870,12 @@ export default function AdminPageClient() {
                     <button
                       type="button"
                       onClick={() => setQuestionsOpen((o) => !o)}
-                      className="mt-2 flex w-full items-center gap-3 rounded-xl border border-dashed border-border bg-surface/40 p-4 text-left text-sm text-muted-foreground transition hover:border-primary/30 hover:bg-surface/60 hover:text-foreground"
+                      className="admin-question-toggle border-border bg-muted/40 hover:bg-muted flex w-full items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-left text-xs text-muted-foreground"
                     >
-                      <PlusCircle className="h-5 w-5 shrink-0 text-muted-foreground" />
+                      <PlusCircle className="h-4 w-4 shrink-0" />
                       {mandatoryQuestionsText.trim()
-                        ? `${mandatoryQuestionsText.split("\n").filter((line) => line.trim()).length} mandatory question(s) defined — click to edit`
-                        : "Click to define mandatory questions for the AI to ask (max 5), or use Generate from JD…"}
+                        ? `${mandatoryQuestionsText.split("\n").filter((line) => line.trim()).length} question(s) — click to edit`
+                        : "Add mandatory questions (max 5)"}
                     </button>
                     {questionsOpen ? (
                       <>
@@ -5079,23 +4887,24 @@ export default function AdminPageClient() {
                           value={mandatoryQuestionsText}
                           onChange={(event) => setMandatoryQuestionsText(event.target.value)}
                         />
-                        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                          Leave blank to auto-generate role-specific technical questions from the job description and key
-                          skills when invites are sent. Ideal answers for grading are generated automatically.
+                        <p className="text-muted-foreground mt-1.5 text-xs">
+                          Leave blank to auto-generate from the JD when invites are sent.
                         </p>
                       </>
                     ) : null}
                   </div>
 
                   <div>
-                    <label className="admin-label">Optional interview topics</label>
+                    <div className="mb-2 flex min-h-7 items-center">
+                      <label className="admin-label mb-0">Optional interview topics</label>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setOptionalQuestionsOpen((o) => !o)}
-                      className="flex w-full items-center gap-3 rounded-xl border border-dashed border-border bg-surface/40 p-4 text-left text-sm text-muted-foreground transition hover:border-primary/30 hover:bg-surface/60 hover:text-foreground"
+                      className="admin-question-toggle border-border bg-muted/40 hover:bg-muted flex w-full items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-left text-xs text-muted-foreground"
                     >
-                      <PlusCircle className="h-5 w-5 shrink-0 text-muted-foreground" />
-                      Add optional questions for random selection during interview...
+                      <PlusCircle className="h-4 w-4 shrink-0" />
+                      Add optional questions
                     </button>
                     {optionalQuestionsOpen ? (
                       <>
@@ -5107,12 +4916,9 @@ export default function AdminPageClient() {
                           value={optionalQuestionsText}
                           onChange={(event) => setOptionalQuestionsText(event.target.value)}
                         />
-                        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                          Ideal answers for optional questions are auto-generated for grading.
-                        </p>
-                        <div className="mt-4">
+                        <div className="mt-2">
                           <label htmlFor="maxOptionalQuestions" className="admin-label">
-                            Max optional questions to ask
+                            Max optional questions
                           </label>
                           <input
                             id="maxOptionalQuestions"
@@ -5124,13 +4930,10 @@ export default function AdminPageClient() {
                             onChange={(event) => updateMaxOptionalQuestions(event.target.value)}
                             className="admin-input"
                           />
-                          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                            Mandatory questions are always prioritized. Optional questions are randomly
-                            selected for each interview.
-                          </p>
                         </div>
                       </>
                     ) : null}
+                  </div>
                   </div>
                     </div>
                   </section>
@@ -5138,19 +4941,26 @@ export default function AdminPageClient() {
               </div>
             </form>
 
-            <div ref={invitePanelRef} className="space-y-5 lg:col-span-4">
-              <div className="admin-card glow-card relative overflow-hidden p-6 md:p-7">
-                <div>
-                  <h3 className="admin-section-title text-xl">Candidate Invites</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    {selectedRequirementId
-                      ? "Add more candidates to this saved requirement. Each gets a unique code and interview link by email."
-                      : "Upload an Excel sheet or add emails manually. Each candidate gets a unique code and interview link by email."}
-                    Codes and links expire <strong className="text-foreground">24 hours</strong> after the invite is sent and each code can only be
-                    used <strong className="text-foreground">once</strong>.
-                  </p>
+            <div ref={invitePanelRef} className="lg:col-span-4">
+              <div
+                className={`admin-card p-4 ${
+                  isRequirementFormValid && parsedEmails.length === 0 ? "admin-card-attention" : ""
+                }`}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2 border-b border-border pb-2.5">
+                    <div>
+                      <h3 className="admin-section-title">Candidate invites</h3>
+                      <p className="text-muted-foreground mt-0.5 text-xs">
+                        Excel or emails. Codes expire in 24 hours and work once.
+                      </p>
+                    </div>
+                    {canSendInvites ? (
+                      <span className="admin-badge shrink-0">Ready to send</span>
+                    ) : null}
+                  </div>
 
-                  <div className="mt-5 grid grid-cols-2 gap-2 rounded-xl bg-surface/60 p-1 ring-1 ring-border">
+                  <div className="bg-muted/80 grid grid-cols-2 gap-1 rounded-xl p-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -5160,9 +4970,9 @@ export default function AdminPageClient() {
                         setError("");
                         if (!excelFileName) setParsedEmails([]);
                       }}
-                      className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-semibold transition-all ${
+                      className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold ${
                         inviteMode === "excel"
-                          ? "bg-surface text-foreground shadow-sm ring-1 ring-border"
+                          ? "bg-background text-foreground shadow-sm"
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
@@ -5178,9 +4988,9 @@ export default function AdminPageClient() {
                         setError("");
                         setParsedEmails(parseManualEmailInput(manualEmailText));
                       }}
-                      className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-semibold transition-all ${
+                      className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold ${
                         inviteMode === "manual"
-                          ? "bg-surface text-foreground shadow-sm ring-1 ring-border"
+                          ? "bg-background text-foreground shadow-sm"
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
@@ -5190,16 +5000,14 @@ export default function AdminPageClient() {
                   </div>
 
                   {inviteMode === "excel" ? (
-                    <div className="mt-5 space-y-3">
-                      <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-surface/40 px-4 py-8 text-center transition hover:border-success/40 hover:bg-success/5">
-                        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface shadow-sm ring-1 ring-border">
-                          <Upload className="h-5 w-5 text-success" />
-                        </div>
-                        <span className="text-sm font-semibold text-foreground">
+                    <div className="mt-0 space-y-2">
+                      <label className="border-border bg-background hover:bg-muted/60 flex min-h-[5.25rem] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-3 py-3.5 text-center transition-colors">
+                        <Upload className="text-muted-foreground mb-1.5 h-4 w-4" />
+                        <span className="text-xs font-semibold">
                           {excelFileName ?? "Upload Excel (.xlsx, .xls, .csv)"}
                         </span>
-                        <span className="mt-1 text-xs text-muted-foreground">
-                          Include an <strong className="text-foreground">email</strong> column with up to {EXCEL_EMAIL_LIMIT} candidates
+                        <span className="text-muted-foreground mt-0.5 text-[11px]">
+                          Email column, up to {EXCEL_EMAIL_LIMIT} candidates
                         </span>
                         <input
                           type="file"
@@ -5208,14 +5016,6 @@ export default function AdminPageClient() {
                           onChange={handleExcelFileChange}
                         />
                       </label>
-                      <a
-                        href="/sample-candidate-invites.xlsx"
-                        download="sample-candidate-invites.xlsx"
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-success underline-offset-2 hover:underline"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        Download sample Excel (3 test emails)
-                      </a>
                       {excelInvalidRows.length > 0 ? (
                         <p className="text-xs text-amber-700">
                           Skipped invalid rows: {excelInvalidRows.join(", ")}
@@ -5233,22 +5033,21 @@ export default function AdminPageClient() {
                       ) : null}
                     </div>
                   ) : (
-                    <div className="mt-5">
+                    <div className="mt-0">
                       <label className="admin-label">
-                        Candidate emails (max {MANUAL_EMAIL_LIMIT})
+                        Emails (max {MANUAL_EMAIL_LIMIT})
                       </label>
                       <textarea
                         value={manualEmailText}
                         onChange={(event) => handleManualEmailChange(event.target.value)}
-                        rows={6}
+                        rows={3}
                         placeholder={"candidate1@company.com\ncandidate2@company.com"}
-                        className="admin-input"
+                        className="admin-input min-h-[5.5rem] resize-y"
                       />
-                      <p className="mt-2 text-xs text-muted-foreground">One email per line, or separated by commas.</p>
                     </div>
                   )}
 
-                  <div className="mt-5 rounded-xl border border-border bg-surface/40 p-4">
+                  <div className="border-border bg-muted/30 rounded-lg border p-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                         Parsed candidates ({parsedEmails.length})
@@ -5304,7 +5103,7 @@ export default function AdminPageClient() {
                         })}
                       </ul>
                     ) : (
-                      <p className="mt-3 text-xs text-muted-foreground">
+                      <p className="mt-1.5 text-xs text-muted-foreground">
                         {inviteMode === "excel"
                           ? "Upload a sheet with an email column to preview candidates."
                           : "Add valid email addresses to preview candidates."}
@@ -5317,35 +5116,51 @@ export default function AdminPageClient() {
                     ) : null}
                   </div>
 
-                  {!canSendInvites && !inviteSending ? (
-                    <p className="mt-4 text-xs text-muted-foreground">
-                      {selectedRequirementId
-                        ? "Add at least one valid email address to send invites."
-                        : "Complete job description, target role, and at least one key skill before sending invites."}
-                    </p>
-                  ) : null}
+                  <div className="space-y-2.5">
+                  <div className="admin-ready-grid rounded-lg border border-border bg-muted/20 p-2.5">
+                    {[
+                      { done: Boolean(targetRole.trim()) || selectedRequirementId !== null, label: "Target role" },
+                      { done: Boolean(jobDescription.trim()) || selectedRequirementId !== null, label: "Job description" },
+                      { done: skills.length > 0 || selectedRequirementId !== null, label: "Key skill" },
+                      { done: parsedEmails.length > 0, label: "Candidate email" },
+                    ].map((step) => (
+                      <div
+                        key={step.label}
+                        className={`admin-ready-step ${step.done ? "is-done text-foreground" : "text-muted-foreground"}`}
+                      >
+                        <span className="admin-ready-step-dot">
+                          {step.done ? <Check className="size-2.5" strokeWidth={3} /> : null}
+                        </span>
+                        {step.label}
+                      </div>
+                    ))}
+                  </div>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
                     <button
                       type="button"
                       onClick={() => void handleSaveRequirement()}
                       disabled={savingRequirement || inviteSending || !isRequirementFormValid || selectedRequirementId !== null}
-                      className="admin-btn-ghost w-full border border-border"
+                      className="admin-btn-ghost inline-flex h-10 w-full items-center justify-center gap-2 border border-border text-xs"
                     >
-                      <Save className="h-5 w-5" />
-                      {savingRequirement ? "Saving requirement…" : "Save Requirement"}
+                      <Save className="h-4 w-4" />
+                      {savingRequirement ? "Saving opening…" : "Save opening for later"}
                     </button>
                     <button
                       type="button"
                       onClick={() => void handleSendInvites()}
                       disabled={inviteSending || savingRequirement || !canSendInvites}
-                      className="admin-btn-accent w-full"
+                      className={`admin-btn-accent h-10 w-full text-xs ${canSendInvites ? "admin-cta-ready" : ""}`}
                     >
-                      <Mail className="h-5 w-5" />
+                      <Mail className="h-4 w-4" />
                       {inviteSending
-                        ? `Sending invites… (${parsedEmails.length} emails)`
-                        : "Send Interview Invites"}
+                        ? `Sending… (${parsedEmails.length})`
+                        : "Send candidate invites"}
                     </button>
+                  </div>
+                  <p className="text-center text-[11px] text-muted-foreground">
+                    Saving keeps this opening for reuse. Sending invites emails candidates now.
+                  </p>
                   </div>
 
                   {inviteSending ? (
@@ -5429,596 +5244,78 @@ export default function AdminPageClient() {
                 </div>
               </div>
 
-              <div className="admin-hero relative overflow-hidden rounded-2xl p-6 text-white">
-                <div className="relative z-10">
-                  <div className="mb-3 flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
-                      <Bot className="h-4 w-4 text-emerald-300" />
-                    </div>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-400/90">
-                      AI Status
-                    </span>
-                  </div>
-                  <p className="text-sm font-medium leading-relaxed text-slate-200">
-                    {authCompanyName} is ready to analyze your inputs and curate a personalized session flow.
-                  </p>
-                  <div className="mt-5 flex items-center gap-3 border-t border-white/10 pt-4">
-                    <div className="flex -space-x-2">
-                      <div className="h-7 w-7 rounded-full border-2 border-[#0f172a] bg-blue-400" />
-                      <div className="h-7 w-7 rounded-full border-2 border-[#0f172a] bg-rose-400" />
-                      <div className="h-7 w-7 rounded-full border-2 border-[#0f172a] bg-amber-400" />
-                    </div>
-                    <span className="text-xs text-slate-400">Used by 4 teams today</span>
-                  </div>
-                </div>
-              </div>
             </div>
           </section>
 
-          {/* Recent sessions */}
-          <section className="space-y-5">
-            <div className="flex items-end justify-between gap-4 px-1">
-              <div>
-                <h3 className="admin-section-title">Recent Sessions</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Live and historic tracking of architectural interviews.
+          <section className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => {
+                applySessionQuickView("ready");
+                goToOpening("sessions");
+              }}
+              className="admin-card admin-kpi cursor-pointer text-left"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Waiting to start
                 </p>
+                <Clock className="size-3.5 text-amber-500" />
               </div>
-              <button
-                type="button"
-                onClick={() => setActiveSection("sessions")}
-                className="flex shrink-0 items-center gap-1 text-sm font-bold text-primary transition hover:opacity-90"
-              >
-                View All History →
-              </button>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              {recentSessions.map((session) => {
-                const isLive = session.status === "LIVE";
-                const isDone = session.status === "COMPLETED";
-                const isReady = session.status === "READY";
-                const match = session.scorecard?.overallScore;
-                const matchStyle = match != null ? sessionMatchStyles(match) : null;
-                return (
-                  <article
-                    key={session.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => void openSessionDetail(session.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        void openSessionDetail(session.id);
-                      }
-                    }}
-                    className="admin-card glow-card group flex cursor-pointer p-5 transition hover:shadow-[var(--shadow-glow)] md:p-6"
-                  >
-                    <div className="flex flex-1 gap-4">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/12 text-xs font-bold text-primary ring-1 ring-primary/25">
-                        {getCandidateInitials(session.candidateName)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold text-foreground">
-                          {session.candidateName ?? "Awaiting candidate"}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {session.positionTitle ?? session.domain} · {formatSessionInviteCode(session)}
-                        </p>
-                        <div className="mt-3 flex flex-wrap items-center gap-3">
-                          {isLive ? (
-                            <span className="rounded-full bg-cyan-500/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-cyan-600 dark:text-cyan-300">
-                              Live
-                            </span>
-                          ) : isDone ? (
-                            <span className="rounded-full bg-success/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-success">
-                              Completed
-                            </span>
-                          ) : isReady ? (
-                            <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-600 dark:text-amber-300">
-                              Ready
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-surface/80 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground ring-1 ring-border">
-                              {session.status}
-                            </span>
-                          )}
-                          {isDone && match != null && matchStyle ? (
-                            <div className="flex items-center gap-2">
-                              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-surface/80 ring-1 ring-border">
-                                <div
-                                  className={`h-full rounded-full ${matchStyle.bar}`}
-                                  style={{ width: `${Math.min(100, match)}%` }}
-                                />
-                              </div>
-                              <span className={`text-[10px] font-black ${matchStyle.text}`}>
-                                {match}% Match
-                              </span>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                    <MoreVertical className="h-5 w-5 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-muted-foreground" />
-                  </article>
-                );
-              })}
-            </div>
-            {!recentSessions.length ? (
-              <p className="px-1 text-sm text-muted-foreground">
-                Load data to see sessions. Generate a code to create the first one.
+              <p className="text-xl font-semibold tabular-nums tracking-tight text-foreground">
+                {sessionStatusCounts.ready}
               </p>
-            ) : null}
+              <p className="text-[11px] text-muted-foreground">
+                {sessionStatusCounts.live > 0
+                  ? `${sessionStatusCounts.live} live now`
+                  : unusedInviteCount > sessionStatusCounts.ready
+                    ? `${unusedInviteCount} unused invites`
+                    : "Have a code, not started"}
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => goToOpening("openings")}
+              className="admin-card admin-kpi cursor-pointer text-left"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Saved openings
+                </p>
+                <FileText className="size-3.5 text-violet-500" />
+              </div>
+              <p className="text-xl font-semibold tabular-nums tracking-tight text-foreground">
+                {inviteGuideOpenings}
+              </p>
+              <p className="truncate text-[11px] text-muted-foreground">
+                {latestSavedOpening ? `Latest: ${latestSavedOpening}` : "Save an opening to reuse it"}
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => goToOpening("openings")}
+              className="admin-card admin-kpi cursor-pointer text-left"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  After you send
+                </p>
+                <Mail className="size-3.5 text-emerald-500" />
+              </div>
+              <p className="text-sm font-semibold text-foreground">Email + unique code</p>
+              <p className="text-[11px] text-muted-foreground">
+                Ask them to check Spam if missing
+              </p>
+            </button>
           </section>
-            </>
-          ) : null}
-        </div>
-
-        <footer className="admin-footer mt-auto border-t py-8">
-          <div className="mx-auto flex max-w-[76rem] flex-col items-center justify-between gap-4 px-8 text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500 md:flex-row">
-            <span>© 2026 UHIRED. All rights reserved.</span>
-            <div className="flex flex-wrap justify-center gap-6">
-              <a href="/privacy" className="transition-colors hover:text-[#0f172a]">
-                Privacy Policy
-              </a>
-              <a href="/terms" className="transition-colors hover:text-[#0f172a]">
-                Terms of Service
-              </a>
-              <a href="#" className="font-bold text-[#0f172a] hover:underline">Security</a>
             </div>
-          </div>
-        </footer>
-      </div>
+          ) : null}
+          </>
+          )}
+    </AppShell>
 
-      {editor ? (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
-          role="presentation"
-          onClick={() => closeEditor()}
-        >
-          <div
-            className={`admin-card w-full shadow-2xl ${
-              editor.kind === "requirement"
-                ? "flex max-h-[85vh] max-w-xl flex-col overflow-hidden"
-                : editor.kind === "session"
-                  ? "max-h-[78vh] max-w-xl overflow-y-auto p-4 sm:p-5"
-                  : editor.kind === "candidate"
-                    ? "max-h-[60vh] max-w-md overflow-y-auto p-4 sm:p-5"
-                    : "max-h-[60vh] max-w-md overflow-y-auto p-4 sm:p-5"
-            }`}
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {editor.kind === "requirement" ? (
-              <div className="shrink-0 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur-sm sm:px-6">
-                <div className="flex items-center justify-between gap-4">
-                  <h4 className="text-lg font-extrabold text-[#1a3352]">Edit Requirement</h4>
-                  <button
-                    type="button"
-                    onClick={() => closeEditor()}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3">
-                <h4 className="text-base font-extrabold text-[#1a3352]">
-                  {editor.kind === "session"
-                    ? "Edit Session"
-                    : editor.kind === "candidate"
-                      ? "Edit Candidate"
-                      : "Edit Requirements"}
-                </h4>
-                <button type="button" onClick={() => closeEditor()} className="admin-btn-ghost px-2 py-1 text-xs">
-                  Close
-                </button>
-              </div>
-            )}
-
-            {editor.kind === "session" ? (
-              sessionEditLoading ? (
-                <p className="py-8 text-center text-sm text-slate-500">Loading session details…</p>
-              ) : sessionEditDetail ? (
-                <form
-                  className="space-y-3"
-                  onSubmit={(e) => void saveSessionEdit(e, sessionEditDetail.id)}
-                >
-                  <div className="admin-code-panel">
-                    <div className="grid gap-2 text-[11px] sm:grid-cols-2">
-                      <p>
-                        <span className="text-slate-500">Status:</span>{" "}
-                        <span className="font-bold text-[#1a3352]">{sessionEditDetail.status}</span>
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-slate-500">Code:</span>
-                        <code className="admin-code-badge admin-code-badge-sm">
-                          {formatSessionInviteCode(sessionEditDetail)}
-                        </code>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-2.5 sm:grid-cols-2">
-                    <label className="block space-y-1">
-                      <span className="admin-label mb-1">Candidate name</span>
-                      <input
-                        name="candidateName"
-                        defaultValue={sessionEditDetail.candidateName ?? ""}
-                        placeholder="Candidate name"
-                        className="admin-input py-2"
-                      />
-                    </label>
-                    <label className="block space-y-1">
-                      <span className="admin-label mb-1">Candidate email</span>
-                      <input
-                        name="candidateEmail"
-                        type="email"
-                        defaultValue={sessionEditDetail.candidateEmail ?? ""}
-                        placeholder="candidate@company.com"
-                        className="admin-input py-2"
-                      />
-                    </label>
-                  </div>
-
-                  {sessionEditDetail.status === "COMPLETED" ? (
-                    <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
-                      Completed session — only candidate name and email can be updated.
-                    </p>
-                  ) : (
-                    <>
-                      <div className="grid gap-2.5 sm:grid-cols-2">
-                        <label className="block space-y-1 sm:col-span-2">
-                          <span className="admin-label mb-1">Position / role</span>
-                          <input
-                            name="positionTitle"
-                            defaultValue={sessionEditDetail.positionTitle ?? ""}
-                            placeholder="e.g. Senior HR Manager"
-                            className="admin-input py-2"
-                            required
-                          />
-                        </label>
-                        <label className="block space-y-1">
-                          <span className="admin-label mb-1">Domain</span>
-                          <input
-                            name="domain"
-                            defaultValue={sessionEditDetail.domain}
-                            placeholder="Domain"
-                            className="admin-input py-2"
-                            required
-                          />
-                        </label>
-                        <label className="block space-y-1">
-                          <span className="admin-label mb-1">Topic</span>
-                          <input
-                            name="topic"
-                            defaultValue={sessionEditDetail.topic}
-                            placeholder="Topic"
-                            className="admin-input py-2"
-                            required
-                          />
-                        </label>
-                        <label className="block space-y-1">
-                          <span className="admin-label mb-1">Duration (min)</span>
-                          <input
-                            name="durationMin"
-                            type="number"
-                            min={5}
-                            max={120}
-                            defaultValue={sessionEditDetail.durationMin}
-                            className="admin-input py-2"
-                            required
-                          />
-                        </label>
-                        <label className="block space-y-1">
-                          <span className="admin-label mb-1">Max optional Qs</span>
-                          <input
-                            name="maxOptionalQuestions"
-                            type="number"
-                            min={0}
-                            max={20}
-                            defaultValue={sessionEditDetail.maxOptionalQuestions}
-                            className="admin-input py-2"
-                          />
-                        </label>
-                      </div>
-
-                      <label className="block space-y-1">
-                        <span className="admin-label mb-1">Job description</span>
-                        <textarea
-                          name="jobDescription"
-                          rows={2}
-                          defaultValue={sessionEditDetail.jobDescription ?? ""}
-                          placeholder="Job description..."
-                          className="admin-input resize-y py-2"
-                        />
-                      </label>
-                      <label className="block space-y-1">
-                        <span className="admin-label mb-1">Key skills (comma-separated)</span>
-                        <input
-                          name="keySkills"
-                          defaultValue={formatSessionKeySkills(sessionEditDetail.keySkills)}
-                          placeholder="e.g. communication, leadership"
-                          className="admin-input py-2"
-                        />
-                      </label>
-                      <label className="block space-y-1">
-                        <span className="admin-label mb-1">Mandatory questions (one per line)</span>
-                        <textarea
-                          name="mandatoryQuestions"
-                          rows={2}
-                          defaultValue={sessionMandatoryPrompts(sessionEditDetail)}
-                          placeholder="One question per line"
-                          className="admin-input resize-y py-2"
-                        />
-                      </label>
-                      <label className="block space-y-1">
-                        <span className="admin-label mb-1">Optional questions (one per line)</span>
-                        <textarea
-                          name="optionalQuestions"
-                          rows={2}
-                          defaultValue={sessionOptionalPrompts(sessionEditDetail)}
-                          placeholder="Optional questions..."
-                          className="admin-input resize-y py-2"
-                        />
-                      </label>
-                    </>
-                  )}
-
-                  <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                    <button type="submit" className="admin-btn-primary px-4 py-2 text-xs">
-                      Save changes
-                    </button>
-                    <button type="button" onClick={() => closeEditor()} className="admin-btn-ghost px-4 py-2 text-xs">
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <p className="py-6 text-center text-sm text-slate-500">Unable to load session.</p>
-              )
-            ) : null}
-
-            {editor.kind === "candidate" && editingCandidate ? (
-              <form
-                className="space-y-3"
-                onSubmit={(e) => void saveCandidateEdit(e, editingCandidate.candidateId)}
-              >
-                <div className="flex flex-wrap gap-x-4 gap-y-1 rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-600 ring-1 ring-slate-200/80">
-                  <span>
-                    Sessions: <strong className="text-[#1a3352]">{editingCandidate.sessionsCount}</strong>
-                  </span>
-                  <span>
-                    Latest: <strong className="text-[#1a3352]">{editingCandidate.latestStatus}</strong>
-                    {editingCandidate.latestScore != null ? (
-                      <span className="ml-1 font-black text-[#00796b]">{editingCandidate.latestScore}%</span>
-                    ) : null}
-                  </span>
-                </div>
-                <label className="block space-y-1">
-                  <span className="admin-label mb-1">Candidate name</span>
-                  <input
-                    name="candidateName"
-                    defaultValue={editingCandidate.candidateName ?? ""}
-                    placeholder="Candidate name"
-                    className="admin-input py-2"
-                    required
-                  />
-                </label>
-                <label className="block space-y-1">
-                  <span className="admin-label mb-1">Candidate email</span>
-                  <input
-                    name="candidateEmail"
-                    type="email"
-                    defaultValue={editingCandidate.candidateEmail ?? ""}
-                    placeholder="candidate@company.com"
-                    className="admin-input py-2"
-                  />
-                </label>
-                <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                  <button type="submit" className="admin-btn-primary px-4 py-2 text-xs">
-                    Save changes
-                  </button>
-                  <button type="button" onClick={() => closeEditor()} className="admin-btn-ghost px-4 py-2 text-xs">
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            ) : null}
-
-            {editor.kind === "requirement" && editingRequirement ? (
-              <form
-                className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5 sm:px-6"
-                onSubmit={(e) => void saveRequirementEdit(e, editingRequirement.requirementId)}
-              >
-                <div className="rounded-xl bg-slate-100/90 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200/60">
-                  <span>
-                    Sessions:{" "}
-                    <strong className="font-bold text-[#1a3352]">{editingRequirement.sessionsCount}</strong>
-                  </span>
-                  <span className="mx-4 text-slate-300">|</span>
-                  <span>
-                    Invites:{" "}
-                    <strong className="font-bold text-[#1a3352]">
-                      {editingRequirement.candidateInvites?.length ?? 0}
-                    </strong>
-                  </span>
-                </div>
-
-                <label className="block space-y-1.5">
-                  <span className="admin-label mb-0">Title</span>
-                  <input
-                    name="title"
-                    defaultValue={editingRequirement.title ?? ""}
-                    placeholder="e.g. HR Fundamentals"
-                    className="w-full rounded-xl border-0 bg-slate-100/90 px-4 py-2.5 text-sm text-slate-800 ring-1 ring-slate-200/60 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
-                  />
-                </label>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="block space-y-1.5">
-                    <span className="admin-label mb-0">Domain</span>
-                    <input
-                      name="domain"
-                      defaultValue={editingRequirement.domain}
-                      placeholder="Domain"
-                      className="w-full rounded-xl border-0 bg-slate-100/90 px-4 py-2.5 text-sm text-slate-800 ring-1 ring-slate-200/60 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
-                      required
-                    />
-                  </label>
-                  <label className="block space-y-1.5">
-                    <span className="admin-label mb-0">Topic</span>
-                    <input
-                      name="topic"
-                      defaultValue={editingRequirement.topic}
-                      placeholder="Topic"
-                      className="w-full rounded-xl border-0 bg-slate-100/90 px-4 py-2.5 text-sm text-slate-800 ring-1 ring-slate-200/60 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
-                      required
-                    />
-                  </label>
-                  <label className="block space-y-1.5">
-                    <span className="admin-label mb-0">Duration (min)</span>
-                    <input
-                      name="durationMin"
-                      type="number"
-                      min={5}
-                      max={120}
-                      defaultValue={editingRequirement.durationMin}
-                      className="w-full rounded-xl border-0 bg-slate-100/90 px-4 py-2.5 text-sm text-slate-800 ring-1 ring-slate-200/60 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
-                      required
-                    />
-                  </label>
-                  <label className="block space-y-1.5">
-                    <span className="admin-label mb-0">Max optional Qs</span>
-                    <input
-                      name="maxOptionalQuestions"
-                      type="number"
-                      min={0}
-                      max={20}
-                      defaultValue={editingRequirement.maxOptionalQuestions}
-                      className="w-full rounded-xl border-0 bg-slate-100/90 px-4 py-2.5 text-sm text-slate-800 ring-1 ring-slate-200/60 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
-                    />
-                  </label>
-                </div>
-
-                <label className="block space-y-1.5">
-                  <span className="admin-label mb-0">Job description</span>
-                  <textarea
-                    name="jobDescription"
-                    defaultValue={editingRequirement.jobDescription ?? ""}
-                    rows={3}
-                    placeholder="Job description..."
-                    className="w-full resize-y rounded-xl border-0 bg-slate-100/90 px-4 py-3 text-sm leading-relaxed text-slate-800 ring-1 ring-slate-200/60 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
-                  />
-                </label>
-
-                <label className="block space-y-1.5">
-                  <span className="admin-label mb-0">Key skills (comma-separated)</span>
-                  <input
-                    name="keySkills"
-                    defaultValue={
-                      Array.isArray(editingRequirement.keySkills)
-                        ? editingRequirement.keySkills.join(", ")
-                        : ""
-                    }
-                    placeholder="e.g. communication, leadership"
-                    className="w-full rounded-xl border-0 bg-slate-100/90 px-4 py-2.5 text-sm text-slate-800 ring-1 ring-slate-200/60 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
-                  />
-                </label>
-
-                <label className="block space-y-1.5">
-                  <span className="admin-label mb-0">Mandatory questions (one per line)</span>
-                  <textarea
-                    name="mandatoryQuestions"
-                    defaultValue={editingRequirement.mandatoryQuestions.join("\n")}
-                    rows={4}
-                    placeholder="One question per line"
-                    className="w-full resize-y rounded-xl border-0 bg-slate-100/90 px-4 py-3 text-sm leading-relaxed text-slate-800 ring-1 ring-slate-200/60 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
-                  />
-                </label>
-
-                <label className="block space-y-1.5">
-                  <span className="admin-label mb-0">Optional questions (one per line)</span>
-                  <textarea
-                    name="optionalQuestions"
-                    defaultValue={editingRequirement.optionalQuestions.join("\n")}
-                    rows={3}
-                    placeholder="Optional questions..."
-                    className="w-full resize-y rounded-xl border-0 bg-slate-100/90 px-4 py-3 text-sm leading-relaxed text-slate-800 ring-1 ring-slate-200/60 transition focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
-                  />
-                </label>
-
-                <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-4">
-                  <button
-                    type="submit"
-                    className="admin-btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm"
-                  >
-                    <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-                    Save changes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => closeEditor()}
-                    className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      <AdminCandidateDetailModal
-        open={candidateViewer !== null || candidateViewerLoading}
-        loading={candidateViewerLoading}
-        detail={candidateViewer}
-        onClose={closeCandidateViewer}
-        onEdit={(candidateId) => setEditor({ kind: "candidate", recordId: candidateId })}
-        onViewSession={(sessionId) => void openSessionDetail(sessionId)}
-        onEditSession={(sessionId) => void openSessionEditor(sessionId)}
-      />
-
-      <AdminSessionDetailModal
-        open={detailSession !== null || detailLoading}
-        loading={detailLoading}
-        session={detailSession}
-        inviteCode={detailSession ? formatSessionInviteCode(detailSession) : ""}
-        onClose={() => setDetailSession(null)}
-        onEdit={(id) => void openSessionEditor(id)}
-        regradeBusy={regradeBusy}
-        onRunAnswerGrading={(id) => void runAnswerGrading(id)}
-        observerLinkBusy={observerLinkBusy}
-        onCreateObserverLink={() => void createObserverLink()}
-        observerLinkUrl={observerLinkUrl}
-        observerLinks={observerLinks}
-        onRevokeObserverLink={(linkId) => void revokeObserverLink(linkId)}
-        onCopy={(text, message) => void copyCode(text, message)}
-        scorecardShareTtlDays={scorecardShareTtlDays}
-        onScorecardShareTtlDaysChange={setScorecardShareTtlDays}
-        scorecardShareIncludeName={scorecardShareIncludeName}
-        onScorecardShareIncludeNameChange={setScorecardShareIncludeName}
-        scorecardShareBusy={scorecardShareBusy}
-        onCreateScorecardShareLink={() => void createScorecardShareLink()}
-        scorecardShareLinks={scorecardShareLinks}
-        lastCreatedShare={lastCreatedShare}
-        onRevokeScorecardShareLink={(linkId) => void revokeScorecardShareLink(linkId)}
-        holisticFormula={HOLISTIC_OVERALL_FORMULA}
-        overallWithAnswerNote={OVERALL_WITH_ANSWER_GRADING_NOTE}
-      />
-
-      <AdminRequirementDetailModal
-        open={requirementViewer !== null}
-        requirement={requirementViewer}
-        onClose={() => setRequirementViewer(null)}
-        onCopyLegacyCode={(code) => void copyCode(code, "Legacy code copied.")}
-        onOpenSession={(sessionId) => {
-          setRequirementViewer(null);
-          void openSessionDetail(sessionId);
-        }}
-      />
-    </div>
+    </>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Briefcase, CheckCircle2, Clock, RefreshCw, Search, X } from "lucide-react";
+import { Briefcase, CheckCircle2, Clock, Eye, RefreshCw, Search, X } from "lucide-react";
 import { useConfirm, useToast } from "@/components/app-feedback";
 import { MasterShell } from "@/components/master-shell";
 import {
@@ -16,11 +16,11 @@ import {
   MasterCard,
   MasterHero,
   MasterKpiCard,
+  MasterSelect,
   masterBtnGhost,
   masterBtnPrimary,
   masterInputClass,
-  masterRowActionClass,
-  masterRowActionDangerClass,
+  MasterRowActionsMenu,
   masterTableHeadClass,
   MasterStatusBadge,
 } from "@/components/master-ui";
@@ -200,7 +200,7 @@ export default function MasterCompanySessionsPage() {
   return (
     <MasterShell
       title="Company Interviews"
-      subtitle="Monitor and manage hiring interview sessions across all tenant companies."
+      subtitle="Monitor and manage hiring interviews across all companies on the platform."
       topActions={
         <button type="button" onClick={() => void load()} className={`${masterBtnGhost} inline-flex items-center gap-2 !px-4 !py-2.5`}>
           <RefreshCw className="h-4 w-4" />
@@ -212,6 +212,17 @@ export default function MasterCompanySessionsPage() {
         {error ? <MasterAlert variant="error">{error}</MasterAlert> : null}
         {success ? <MasterAlert variant="success">{success}</MasterAlert> : null}
 
+        {details !== null || detailsLoadingId !== null ? (
+          <MasterCompanySessionDetailModal
+            open
+            loading={detailsLoadingId !== null && details === null}
+            session={details}
+            onClose={closeDetails}
+            onDelete={(sessionId) => void deleteSession(sessionId)}
+            deleteBusy={details !== null && deleteLoadingId === details.id}
+          />
+        ) : (
+        <>
         <MasterHero
           badge="HIRING SESSIONS"
           title="Company interview monitoring"
@@ -270,17 +281,18 @@ export default function MasterCompanySessionsPage() {
 
               <label className="block space-y-1.5">
                 <span className="admin-label">Status</span>
-                <select
+                <MasterSelect
                   value={statusInput}
-                  onChange={(e) => setStatusInput(e.target.value as typeof statusInput)}
-                  className={`${masterInputClass} w-full`}
+                  onValueChange={(value) => setStatusInput(value as typeof statusInput)}
+                  className="w-full"
                   aria-label="Filter by status"
-                >
-                  <option value="">All statuses</option>
-                  <option value="LIVE">LIVE</option>
-                  <option value="READY">READY</option>
-                  <option value="COMPLETED">COMPLETED</option>
-                </select>
+                  options={[
+                    { value: "", label: "All statuses" },
+                    { value: "LIVE", label: "LIVE" },
+                    { value: "READY", label: "READY" },
+                    { value: "COMPLETED", label: "COMPLETED" },
+                  ]}
+                />
               </label>
 
               <div className="flex flex-wrap gap-2">
@@ -350,8 +362,7 @@ export default function MasterCompanySessionsPage() {
                   <th className="pr-3">Role / Track</th>
                   <th className="pr-3">Status</th>
                   <th className="pr-3">Score</th>
-                  <th className="pr-3">View</th>
-                  <th>Delete</th>
+                  <th className="w-10 text-right"> </th>
                 </tr>
               </thead>
               <tbody>
@@ -382,15 +393,24 @@ export default function MasterCompanySessionsPage() {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="pr-3">
-                      <button type="button" onClick={() => void viewDetails(row.id)} className={masterRowActionClass}>
-                        {detailsLoadingId === row.id ? "Loading..." : "View"}
-                      </button>
-                    </td>
-                    <td>
-                      <button type="button" onClick={() => void deleteSession(row.id)} className={masterRowActionDangerClass}>
-                        {deleteLoadingId === row.id ? "Deleting..." : "Delete"}
-                      </button>
+                    <td className="text-right">
+                      <MasterRowActionsMenu
+                        label={row.candidateName}
+                        actions={[
+                          {
+                            label: detailsLoadingId === row.id ? "Loading..." : "View",
+                            icon: Eye,
+                            onClick: () => void viewDetails(row.id),
+                            disabled: detailsLoadingId === row.id,
+                          },
+                          {
+                            label: deleteLoadingId === row.id ? "Deleting..." : "Delete",
+                            onClick: () => void deleteSession(row.id),
+                            danger: true,
+                            disabled: deleteLoadingId === row.id,
+                          },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -410,15 +430,8 @@ export default function MasterCompanySessionsPage() {
             }}
           />
         </MasterCard>
-
-        <MasterCompanySessionDetailModal
-          open={details !== null || detailsLoadingId !== null}
-          loading={detailsLoadingId !== null && details === null}
-          session={details}
-          onClose={closeDetails}
-          onDelete={(sessionId) => void deleteSession(sessionId)}
-          deleteBusy={details !== null && deleteLoadingId === details.id}
-        />
+        </>
+        )}
       </div>
     </MasterShell>
   );

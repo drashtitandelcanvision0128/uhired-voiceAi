@@ -9,13 +9,20 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const status = url.searchParams.get("status")?.trim().toUpperCase();
+  const search = url.searchParams.get("search")?.trim() ?? "";
   const page = Math.max(1, Number(url.searchParams.get("page") ?? "1") || 1);
   const pageSize = Math.min(50, Math.max(1, Number(url.searchParams.get("pageSize") ?? "20") || 20));
 
-  const where =
-    status === "PENDING" || status === "PROCESSED" || status === "REJECTED"
-      ? { status: status as "PENDING" | "PROCESSED" | "REJECTED" }
-      : {};
+  const where: {
+    status?: "PENDING" | "PROCESSED" | "REJECTED";
+    email?: { contains: string; mode: "insensitive" };
+  } = {};
+  if (status === "PENDING" || status === "PROCESSED" || status === "REJECTED") {
+    where.status = status;
+  }
+  if (search) {
+    where.email = { contains: search, mode: "insensitive" };
+  }
 
   const [requests, total] = await Promise.all([
     prisma.dataDeletionRequest.findMany({

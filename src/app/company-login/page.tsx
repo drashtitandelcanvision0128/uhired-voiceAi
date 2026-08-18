@@ -16,8 +16,8 @@ export default function CompanyLoginPage() {
     setBusy(true);
     setError("");
     const form = new FormData(e.currentTarget);
-    const companyEmail = String(form.get("companyEmail") ?? "").trim().toLowerCase();
-    const passcode = String(form.get("passcode") ?? "").trim();
+    const companyEmail = String(form.get("companyEmail") ?? "").replace(/\s+/g, "").toLowerCase();
+    const passcode = String(form.get("passcode") ?? "").replace(/\s+/g, "");
 
     if (!companyEmail || !passcode) {
       setError("Email and passcode are required.");
@@ -36,7 +36,7 @@ export default function CompanyLoginPage() {
         setError(data.error ?? "Sign in failed. Check your credentials.");
         return;
       }
-      router.push("/admin");
+      router.push("/admin/dashboard");
     } catch {
       setError("Unable to sign in right now. Please try again.");
     } finally {

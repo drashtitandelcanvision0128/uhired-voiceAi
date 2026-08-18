@@ -201,7 +201,7 @@ export function TrustBar() {
           "Structured scorecards",
           "Bias-aware evaluation",
           "Hiring analytics",
-          "Multi-tenant workspaces",
+          "Dedicated company workspaces",
         ].map((t) => (
           <span
             key={t}

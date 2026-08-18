@@ -25,6 +25,7 @@ import {
   MasterStatusBadge,
   masterBtnPrimary,
 } from "@/components/master-ui";
+import { AppSelect } from "@/components/ui/app-select";
 
 export type AdminSessionDetail = {
   id: string;
@@ -145,13 +146,13 @@ type AdminSessionDetailModalProps = {
   onRevokeScorecardShareLink: (linkId: string) => void;
   holisticFormula: string;
   overallWithAnswerNote: string;
+  presentation?: "modal" | "page";
 };
 
 function MetaField({
   label,
   value,
   subValue,
-  icon: Icon,
 }: {
   label: string;
   value: string;
@@ -159,13 +160,10 @@ function MetaField({
   icon?: typeof User;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surface/40 p-3.5">
-      <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-        {Icon ? <Icon className="h-3 w-3" aria-hidden /> : null}
-        {label}
-      </p>
-      <p className="mt-1.5 text-sm font-semibold text-foreground">{value}</p>
-      {subValue ? <p className="mt-0.5 text-xs text-muted-foreground">{subValue}</p> : null}
+    <div className="admin-card px-3 py-2">
+      <p className="text-muted-foreground text-[11px]">{label}</p>
+      <p className="text-sm font-semibold">{value}</p>
+      {subValue ? <p className="text-muted-foreground text-xs">{subValue}</p> : null}
     </div>
   );
 }
@@ -245,6 +243,7 @@ export function AdminSessionDetailModal({
   onRevokeScorecardShareLink,
   holisticFormula,
   overallWithAnswerNote,
+  presentation = "page",
 }: AdminSessionDetailModalProps) {
   const candidateLabel = session?.candidateName ?? "—";
   const roleLabel = session?.positionTitle ?? "—";
@@ -255,6 +254,7 @@ export function AdminSessionDetailModal({
       onClose={onClose}
       loading={loading}
       size="xl"
+      presentation={presentation}
       ariaLabelledBy="admin-session-detail-title"
       title="Session detail"
       subtitle={
@@ -284,13 +284,12 @@ export function AdminSessionDetailModal({
       }
     >
       {loading && !session ? (
-        <div className="flex flex-col items-center justify-center gap-4 py-20">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden />
-          <p className="text-sm font-semibold text-muted-foreground">Loading session details…</p>
+        <div className="flex items-center justify-center py-10">
+          <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" aria-hidden />
         </div>
       ) : session ? (
-        <div className="space-y-5">
-          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-3">
+          <section className="grid grid-cols-2 gap-2 xl:grid-cols-4">
             <MetaField
               label="Candidate"
               value={candidateLabel}
@@ -306,15 +305,12 @@ export function AdminSessionDetailModal({
               subValue={`Allocated slot: ${session.durationMin} min`}
               icon={Clock}
             />
-            <div className="rounded-xl border border-border bg-surface/40 p-3.5">
-              <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                <Video className="h-3 w-3" aria-hidden />
-                Recording audit
-              </p>
-              <div className="mt-2">
+            <div className="admin-card px-3 py-2">
+              <p className="text-muted-foreground text-[11px]">Recording</p>
+              <div className="mt-1">
                 <RecordingBadge status={session.videoRecordingStatus} />
                 {session.videoUploadedAt ? (
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="text-muted-foreground mt-0.5 text-xs">
                     {formatDateTime(session.videoUploadedAt)}
                   </p>
                 ) : null}
@@ -582,17 +578,18 @@ export function AdminSessionDetailModal({
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block space-y-1.5">
                   <span className="admin-label mb-0">Expires in</span>
-                  <select
-                    className="admin-input py-2 text-sm"
-                    value={scorecardShareTtlDays}
-                    onChange={(e) => onScorecardShareTtlDaysChange(Number(e.target.value))}
+                  <AppSelect
+                    value={String(scorecardShareTtlDays)}
+                    onValueChange={(value) => onScorecardShareTtlDaysChange(Number(value))}
                     disabled={scorecardShareBusy}
-                  >
-                    <option value={7}>7 days</option>
-                    <option value={14}>14 days</option>
-                    <option value={30}>30 days</option>
-                    <option value={90}>90 days</option>
-                  </select>
+                    aria-label="Share link expiry"
+                    options={[
+                      { value: "7", label: "7 days" },
+                      { value: "14", label: "14 days" },
+                      { value: "30", label: "30 days" },
+                      { value: "90", label: "90 days" },
+                    ]}
+                  />
                 </label>
                 <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-surface/40 px-3 py-2.5 text-sm text-foreground sm:mt-5">
                   <input

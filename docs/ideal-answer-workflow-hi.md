@@ -1,82 +1,81 @@
-# Ideal answer + grading — पूरा workflow (हिंदी / Hinglish)
+# Ideal Answer + Grading — Full Workflow
 
-यह दस्तावेज़ बताता है कि इंटरव्यू खत्म होने के बाद **सवाल → उम्मीदवार का जवाब → ideal (मॉडल) जवाब → स्कोर** कैसे बनते हैं, और quality कैसे बढ़ाएँ।
+This document explains what happens after an interview ends: **question -> candidate answer -> ideal/model answer -> score**, and how to improve output quality.
 
-> **«100% perfect» के बारे में सच:** speech-to-text, voice वариशन, और LLM की स्वभाविक variation की वजह से **शब्द-दर-शब्द 100% match** हमेशा नहीं होगा। सिस्टम **intent alignment** (मुद्दा सही पकड़ना) पर काम करता है। अच्छा माइक, साफ transcript, मज़बूत role/JD/skills से practical में **बहुत ऊँची accuracy** मिलती है।
-
----
-
-## Step-by-step — app में क्या होता है
-
-### चरण 0 — पहले से (Admin)
-
-1. Company admin requirement बनाता है: **target role**, **job description**, **key skills**, topic / mandatory questions।  
-2. यह context बाद में ideal answers को generic नहीं, **आपकी hiring situation** से जोड़ता है।
-
-### चरण 1 — Live interview
-
-1. Candidate realtime voice interview देता है।  
-2. Interviewer AI natural तरीके से पूछता है; बातचीत **transcript** के रूप में save होती है।
-
-### चरण 2 — Interview complete (`POST /api/interview/[sessionId]/complete`)
-
-1. Client से आया transcript (अगर है) DB में merge होता है।  
-2. **Q&A निकालना:**  
-   - Transcript से substantive **question–answer pairs** निकाले जाते हैं (model + heuristics — देखें `extract-transcript-qa` / `transcript-grading-questions`।)  
-   - अगर transcript से कोई Q&A न मिले तो **admin की topic list** fallback के तौर पर use होती है (ideal answers फिर भी fresh generate होते हैं)।  
-3. **Ideal answer (expected answer):**  
-   - हर ऐसे question के लिए जिसमें अभी ideal नहीं है, OpenAI से **उसी transcript वाले सवाल** (+ role, JD, skills, ज़रूरत हो तो transcript snippet) के आधार पर **एक ideal** generate होता है।  
-   - यह admin bank से copy-paste **नहीं** है — context के साथ नया लिखा जाता है।  
-4. **Grading:**  
-   - Candidate answer को ideal और rubric categories से compare करके scores, feedback, **accuracyPercent** आदि scorecard में merge होते हैं (`question-grading`।
-
-5. Session **COMPLETED** mark, scorecard DB में persist।
-
-### चरण 3 — Admin देखता है
-
-Session details / scorecard share पर: **question, ideal, candidate answer, feedback** दिख सकता है।
-
-### चरण 4 — पुरानी sessions को दोबारा grade (`POST /api/admin/session/[sessionId]/regrade`)
-
-deploy के बाद logic बदला हो तो completed session पर **re-grade**: transcript से फिर से ideals + grades बनते हैं।
+> **The truth about "100% perfect":** because of speech-to-text noise, voice variation, and normal LLM variation, a **word-for-word 100% match** is not always realistic. The system is designed around **intent alignment** rather than literal matching. A good microphone, a clean transcript, and strong role/JD/skills context usually produce **very high practical accuracy**.
 
 ---
 
-## Pros (फायदे) और Cons (नुकसान) — और कैसे कम करें
+## Step by Step — What Happens in the App
 
-| Pros | क्यों अच्छा है |
+### Stage 0 — Before the Interview (Admin setup)
+
+1. The company admin creates the requirement: **target role**, **job description**, **key skills**, and topic/mandatory questions.
+2. This context helps keep ideal answers tied to the **actual hiring situation** instead of becoming generic.
+
+### Stage 1 — Live Interview
+
+1. The candidate takes a real-time voice interview.
+2. The AI interviewer asks questions naturally, and the conversation is saved as a **transcript**.
+
+### Stage 2 — Interview Complete (`POST /api/interview/[sessionId]/complete`)
+
+1. The transcript received from the client, if present, is merged into the database.
+2. **Q&A extraction:**
+   - Substantive **question-answer pairs** are extracted from the transcript using models plus heuristics. See `extract-transcript-qa` and `transcript-grading-questions`.
+   - If no usable Q&A pairs are found, the **admin topic list** is used as a fallback. Ideal answers are still generated fresh.
+3. **Ideal answer generation:**
+   - For each question that does not already have an ideal answer, OpenAI generates **one ideal answer** based on the actual transcript question, plus role, JD, skills, and transcript snippet if needed.
+   - This is **not** copy-pasted from an admin answer bank. It is generated again with context.
+4. **Grading:**
+   - The candidate answer is compared against the ideal answer and rubric categories. Scores, feedback, and **accuracyPercent** are merged into the scorecard through `question-grading`.
+5. The session is marked **COMPLETED**, and the scorecard is persisted in the database.
+
+### Stage 3 — Admin Review
+
+In session details or shared scorecards, the admin can see: **question, ideal answer, candidate answer, and feedback**.
+
+### Stage 4 — Regrading Old Sessions (`POST /api/admin/session/[sessionId]/regrade`)
+
+If the grading logic changes after deployment, a completed session can be **re-graded**. The system regenerates ideals and grades again from the transcript.
+
+---
+
+## Pros and Cons — and How to Reduce Risk
+
+| Pros | Why it helps |
+|------|--------------|
+| Transcript-first | Grading is based on what was **actually asked**, which is more honest than relying on a scripted list. |
+| Per-question ideal | Each question gets its own ideal answer, reducing prompt/answer mix-ups in batch grading. |
+| Snippet context | Follow-up or ambiguous questions can be understood using nearby transcript context. |
+
+| Cons | Mitigation |
+|------|------------|
+| API latency + cost (N questions = multiple calls) | Use a parallel cap such as `concurrency: 3`; reduce question count when appropriate. |
+| Poor transcript quality leads to poor extraction | Use a clear microphone, reduce background noise, and send the full transcript on completion. |
+| Fallback agenda when transcript is empty or weak | Keep requirement-level mandatory questions clear and specific. |
+
+---
+
+## Quality Checklist
+
+| Item | Why it matters |
 |------|----------------|
-| Transcript-first | जो **वास्तव में पूछा गया** उसी पर grade — scripted list से ज़्यादा honest। |
-| Per-question ideal | हर सवाल का अलग ideal — batch में prompt/answer मिलान कम होता है। |
-| Snippet context | Follow-up / ambiguous सवालों के लिए आसपास की बात से scope clear। |
-
-| Cons | Mitigation (कम कैसे करें) |
-|------|---------------------------|
-| API latency + cost (N सवाल ⇒ कई calls) | Parallel cap (`concurrency: 3` जैसा); ज़रूरत हो तो question count समझदारी से। |
-| Transcript गड़बड़ ⇒ extraction गड़बड़ |_clear mic, कम शोर; complete पर पूरा transcript भेजना। |
-| Fallback agenda जब transcript खाली/weak | Requirement में साफ़ mandatory questions रखें। |
+| `OPENAI_API_KEY` is set | Required for both ideal generation and grading. |
+| Strong **role + JD + skills** | Reduces generic ideals and improves role-specific output. |
+| Optional: better `SCORING_MODEL` | Usually improves quality, but may increase cost. |
+| Send the **transcript** when the interview ends | Better transcript turns in the database improve extraction quality. |
 
 ---
 
-## Quality checklist (ज़्यादा «सही» ideal + score के लिए)
+## Testing — What a Developer Can Run
 
-| चीज़ | क्यों |
-|------|-------|
-| `OPENAI_API_KEY` set | Ideal + grading दोनों के लिए ज़रूरी। |
-| अच्छा **role + JD + skills** | Generic ideals कम, role-specific ज़्यादा। |
-| Optional: `SCORING_MODEL` / मज़बूत model | अक्सर quality ↑, cost ↑। |
-| Interview खत्म करते समय **transcript** भेजना | DB में सही turns ⇒ extraction अच्छा। |
+1. **Lint:** `npm run lint` — checks code quality and syntax.
+2. **Regrade API smoke test** (requires a dev server + admin cookie):
+   `node scripts/test-grading-pipeline.mjs <sessionId>`
+   Env: `TEST_BASE_URL` (default `http://localhost:3000`) and `ADMIN_COOKIE`.
+3. **Direct pipeline from DB** (Prisma + dynamic TS import):
+   `node scripts/run-session-regrade-test.mjs <sessionId>` — requires DB URL in `.env`.
+4. Other useful scripts: `test-transcript-extract.mjs`, `test-openai-ideal.mjs`, `check-question-grading.mjs`, `debug-session-grading.mjs`.
 
----
-
-## Testing — मैं (developer) क्या चला सकता हूँ
-
-1. **Lint:** `npm run lint` — code quality / syntax।  
-2. **Regrade API smoke test** (dev server + admin cookie चाहिए):  
-   `node scripts/test-grading-pipeline.mjs <sessionId>`  
-   Env: `TEST_BASE_URL` (default `http://localhost:3000`), `ADMIN_COOKIE`।  
-3. **DB से direct pipeline** (Prisma + dynamic TS import):  
-   `node scripts/run-session-regrade-test.mjs <sessionId>` — `.env` में DB URL।  
-4. अन्य scripts: `test-transcript-extract.mjs`, `test-openai-ideal.mjs`, `check-question-grading.mjs`, `debug-session-grading.mjs` — ज़रूरत के हिसाब से।
-
-English संक्षिप्त संस्करण: [`ideal-answer-workflow.md`](./ideal-answer-workflow.md)
+English short version: [`ideal-answer-workflow.md`](./ideal-answer-workflow.md)

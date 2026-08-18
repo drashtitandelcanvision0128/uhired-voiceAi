@@ -74,6 +74,8 @@ type ListMasterLoginEventsOptions = {
   page?: number;
   pageSize?: number;
   success?: boolean;
+  search?: string;
+  trustDevice?: boolean;
 };
 
 export async function listMasterLoginEvents(
@@ -85,7 +87,20 @@ export async function listMasterLoginEvents(
   const skip = (page - 1) * pageSize;
 
   if (hasMasterLoginEventDelegate(client)) {
-    const where = options.success === undefined ? undefined : { success: options.success };
+    const where: {
+      success?: boolean;
+      trustDevice?: boolean;
+      OR?: Array<Record<string, { contains: string; mode: "insensitive" }>>;
+    } = {};
+    if (options.success !== undefined) where.success = options.success;
+    if (options.trustDevice !== undefined) where.trustDevice = options.trustDevice;
+    const search = options.search?.trim();
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: "insensitive" } },
+        { clientIp: { contains: search, mode: "insensitive" } },
+      ];
+    }
     const [rows, total] = await Promise.all([
       client.masterLoginEvent.findMany({
         where,

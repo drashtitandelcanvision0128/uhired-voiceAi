@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, ShieldAlert } from "lucide-react";
+import { RefreshCw, Search, ShieldAlert } from "lucide-react";
 import { useToast } from "@/components/app-feedback";
 import { MasterShell } from "@/components/master-shell";
 import {
@@ -15,9 +15,10 @@ import {
   MasterCard,
   MasterHero,
   MasterInlineKpi,
+  MasterSelect,
   masterBtnGhost,
   masterInputClass,
-  masterRowActionClass,
+  MasterRowActionsMenu,
   masterTableHeadClass,
 } from "@/components/master-ui";
 
@@ -45,6 +46,8 @@ export default function MasterDataDeletionPage() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"" | "PENDING" | "PROCESSED" | "REJECTED">("");
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<MasterPageSize>(MASTER_PAGE_SIZE_OPTIONS[0]);
 
@@ -54,6 +57,7 @@ export default function MasterDataDeletionPage() {
     try {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (filter) params.set("status", filter);
+      if (appliedSearch) params.set("search", appliedSearch);
       const res = await fetch(`/api/master/data-deletion-requests?${params.toString()}`);
       const payload = (await res.json()) as ListResponse & { error?: string };
       if (res.status === 401) {
@@ -68,7 +72,7 @@ export default function MasterDataDeletionPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, page, pageSize, filter]);
+  }, [router, page, pageSize, filter, appliedSearch]);
 
   useEffect(() => {
     void load();
@@ -76,7 +80,7 @@ export default function MasterDataDeletionPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [filter, pageSize]);
+  }, [filter, appliedSearch, pageSize]);
 
   async function updateStatus(requestId: string, status: "PROCESSED" | "REJECTED") {
     setError("");
@@ -143,19 +147,41 @@ export default function MasterDataDeletionPage() {
         <MasterCard
           elevated
           title="Requests"
-          headerAction={
-            <select
-              value={filter}
-              onChange={(event) => setFilter(event.target.value as typeof filter)}
-              className={masterInputClass}
-            >
-              <option value="">All statuses</option>
-              <option value="PENDING">Pending</option>
-              <option value="PROCESSED">Processed</option>
-              <option value="REJECTED">Rejected</option>
-            </select>
-          }
         >
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[14rem] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") setAppliedSearch(searchInput.trim());
+                }}
+                placeholder="Search email..."
+                className={`${masterInputClass} w-full pl-10`}
+                aria-label="Search deletion requests"
+              />
+            </div>
+            <MasterSelect
+              value={filter}
+              onValueChange={(value) => setFilter(value as typeof filter)}
+              className="min-w-[11rem]"
+              aria-label="Filter by status"
+              options={[
+                { value: "", label: "All statuses" },
+                { value: "PENDING", label: "Pending" },
+                { value: "PROCESSED", label: "Processed" },
+                { value: "REJECTED", label: "Rejected" },
+              ]}
+            />
+            <button
+              type="button"
+              onClick={() => setAppliedSearch(searchInput.trim())}
+              className={`${masterBtnGhost} !px-4`}
+            >
+              Search
+            </button>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead>
@@ -192,27 +218,25 @@ export default function MasterDataDeletionPage() {
                     <td className="pr-4 text-xs text-slate-500">
                       {new Date(row.createdAt).toLocaleString()}
                     </td>
-                    <td className="space-x-2">
-                      {row.status === "PENDING" ? (
-                        <>
-                          <button
-                            type="button"
-                            className={masterRowActionClass}
-                            onClick={() => void updateStatus(row.id, "PROCESSED")}
-                          >
-                            Mark processed
-                          </button>
-                          <button
-                            type="button"
-                            className={masterRowActionClass}
-                            onClick={() => void updateStatus(row.id, "REJECTED")}
-                          >
-                            Reject
-                          </button>
-                        </>
-                      ) : (
-                        <span className="text-xs text-slate-400">—</span>
-                      )}
+                    <td className="text-right">
+                      <MasterRowActionsMenu
+                        label={row.email}
+                        actions={[
+                          row.status === "PENDING"
+                            ? {
+                                label: "Mark processed",
+                                onClick: () => void updateStatus(row.id, "PROCESSED"),
+                              }
+                            : null,
+                          row.status === "PENDING"
+                            ? {
+                                label: "Reject",
+                                onClick: () => void updateStatus(row.id, "REJECTED"),
+                                danger: true,
+                              }
+                            : null,
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}

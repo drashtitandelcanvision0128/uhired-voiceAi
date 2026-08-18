@@ -70,7 +70,7 @@ export async function GET(request: Request) {
       notifications.push({
         id: "live-sessions",
         title: "Live interviews",
-        body: `${liveSessions} session${liveSessions === 1 ? "" : "s"} currently in progress across the platform.`,
+        body: `${liveSessions} interview${liveSessions === 1 ? "" : "s"} happening right now.`,
         time: "Now",
         href: "/master/practice-sessions",
         unread: true,
@@ -80,10 +80,10 @@ export async function GET(request: Request) {
     if (newSupportCount > 0) {
       notifications.push({
         id: "support-new",
-        title: "New support inquiries",
+        title: "New support tickets",
         body: latestSupport
           ? `${newSupportCount} unread message${newSupportCount === 1 ? "" : "s"}. Latest: "${latestSupport.subject}".`
-          : `${newSupportCount} unread support message${newSupportCount === 1 ? "" : "s"} waiting for review.`,
+          : `${newSupportCount} unread support message${newSupportCount === 1 ? "" : "s"} waiting for a reply.`,
         time: latestSupport ? formatRelativeTime(latestSupport.createdAt) : "Today",
         href: "/master/support",
         unread: true,
@@ -103,8 +103,8 @@ export async function GET(request: Request) {
     if (recentPracticeSessions > 0) {
       notifications.push({
         id: "practice-activity",
-        title: "Practice activity",
-        body: `${recentPracticeSessions} practice session${recentPracticeSessions === 1 ? "" : "s"} started in the last 24 hours.`,
+        title: "Practice interviews",
+        body: `${recentPracticeSessions} practice interview${recentPracticeSessions === 1 ? "" : "s"} started in the last 24 hours.`,
         time: "24h",
         href: "/master/practice-sessions",
       });

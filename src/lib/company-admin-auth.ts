@@ -17,16 +17,29 @@ export type CompanyAdminSession = {
 /** 90-minute fixed company admin session window. */
 const COMPANY_SESSION_TTL_SEC = 60 * 90;
 
+function stripWhitespace(value: string) {
+  return value.replace(/\s+/g, "");
+}
+
 export const companyAdminLoginSchema = z.object({
-  companyEmail: z.string().trim().email(),
-  passcode: z.string().trim().min(1),
+  companyEmail: z
+    .string()
+    .transform((value) => stripWhitespace(value).toLowerCase())
+    .pipe(z.string().email()),
+  passcode: z.string().transform(stripWhitespace).pipe(z.string().min(1)),
 });
 
 export const companyRegisterSchema = z.object({
   companyName: z.string().trim().min(1, "Company name is required."),
   companyDomain: z.string().trim().min(1, "Corporate domain is required."),
-  companyEmail: z.string().trim().email("Enter a valid work email."),
-  passcode: z.string().trim().min(6, "Passcode must be at least 6 characters."),
+  companyEmail: z
+    .string()
+    .transform((value) => stripWhitespace(value).toLowerCase())
+    .pipe(z.string().email("Enter a valid work email.")),
+  passcode: z
+    .string()
+    .transform(stripWhitespace)
+    .pipe(z.string().min(6, "Passcode must be at least 6 characters.")),
   honeypot: z.string().optional(),
 });
 

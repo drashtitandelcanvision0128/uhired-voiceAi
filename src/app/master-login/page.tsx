@@ -24,23 +24,23 @@ function formatLastLogin(value: string) {
 const masterHighlights = [
   {
     Icon: Building2,
-    title: "Platform-wide company control",
-    copy: "Monitor every tenant and hiring activity from one dashboard.",
+    title: "All companies in one place",
+    copy: "See every company, their interviews, and hiring activity.",
   },
   {
     Icon: Activity,
-    title: "Live operations & audit logs",
-    copy: "Track sessions, payments, and support across the stack.",
+    title: "Live interviews & support",
+    copy: "Track ongoing interviews, payments, and support tickets.",
   },
   {
     Icon: BarChart3,
-    title: "Reports & system health",
-    copy: "Leadership metrics and integration readiness in one place.",
+    title: "Reports & platform health",
+    copy: "Check interview numbers, revenue, and whether the platform is running well.",
   },
   {
     Icon: Shield,
-    title: "Secured master access",
-    copy: "Rate limiting, audit trails, and trusted-device sessions.",
+    title: "Secure master login",
+    copy: "Protected sign-in with login history and trusted devices.",
   },
 ];
 
@@ -72,7 +72,7 @@ export default function MasterLoginPage() {
     const passcode = String(form.get("passcode") ?? "").trim();
 
     if (!adminEmail || !passcode) {
-      setError("Email and passcode are required.");
+      setError("Email and password are required.");
       setBusy(false);
       return;
     }
@@ -98,13 +98,13 @@ export default function MasterLoginPage() {
 
   return (
     <AuthShell
-      eyebrow="Master control"
+      eyebrow="Master login"
       title={
         <>
-          Master <span className="text-gradient">Portal Access</span>
+          Welcome back to <span className="text-gradient">Master Control</span>
         </>
       }
-      subtitle="Sign in with your master admin credentials to manage companies, sessions, payments, and platform settings."
+      subtitle="Sign in to manage companies, interviews, payments, and platform settings."
       highlights={masterHighlights}
       footer={
         <>
@@ -120,21 +120,18 @@ export default function MasterLoginPage() {
         </>
       }
     >
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-2 rounded-full border border-violet/40 bg-violet/10 px-3 py-1 font-mono text-[10px] tracking-widest text-violet uppercase">
-          Master Control
-        </span>
-        {loginContext?.environmentLabel ? (
+      {loginContext?.environmentLabel ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           <span
-            className={`inline-flex rounded-full border px-3 py-1 font-mono text-[10px] tracking-widest uppercase ${loginContext.environmentBadgeClass ?? "border-border bg-surface/60 text-muted-foreground"}`}
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 font-mono text-[11px] tracking-[0.2em] uppercase ${loginContext.environmentBadgeClass ?? "border-border bg-surface/70 text-muted-foreground"}`}
           >
             {loginContext.environmentLabel}
           </span>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {loginContext?.lastSuccessfulLogin ? (
-        <div className="mb-4 rounded-xl border border-border bg-surface/50 px-4 py-3 text-xs text-muted-foreground">
+        <div className="mb-4 rounded-xl border border-border bg-surface/50 px-4 py-3 text-sm text-muted-foreground">
           Last successful sign-in:{" "}
           <span className="font-medium text-foreground">{formatLastLogin(loginContext.lastSuccessfulLogin)}</span>
           {loginContext.maskedAdminEmail ? (
@@ -148,7 +145,7 @@ export default function MasterLoginPage() {
 
       <form className="grid gap-4" onSubmit={onSubmit}>
         <Field
-          label="Master admin email"
+          label="Email"
           type="email"
           name="adminEmail"
           required
@@ -156,7 +153,7 @@ export default function MasterLoginPage() {
           autoComplete="username"
         />
         <Field
-          label="Master passcode"
+          label="Password"
           type="password"
           name="passcode"
           required
@@ -170,7 +167,7 @@ export default function MasterLoginPage() {
             onChange={(e) => setTrustDevice(e.target.checked)}
             className="h-4 w-4 rounded border-border bg-surface accent-primary"
           />
-          Trust this device for 30 days (extended session)
+          Keep me signed in on this device for 30 days
         </label>
         <button
           type="submit"
@@ -179,7 +176,7 @@ export default function MasterLoginPage() {
           style={{ background: "var(--gradient-brand)", boxShadow: "var(--shadow-glow)" }}
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-          Continue to master portal <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          Continue to dashboard <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </button>
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
       </form>

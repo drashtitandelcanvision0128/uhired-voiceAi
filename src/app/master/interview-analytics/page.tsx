@@ -18,8 +18,8 @@ import {
   MasterCard,
   MasterHero,
   MasterKpiCard,
+  MasterSelect,
   masterBtnGhost,
-  masterInputClass,
   masterTableHeadClass,
 } from "@/components/master-ui";
 
@@ -172,17 +172,19 @@ export default function MasterInterviewAnalyticsPage() {
           subtitle="Track how companies create interview requirements, send invites, and conduct AI interviews."
         >
           <div className="flex flex-wrap items-center gap-3">
-            <label className="text-xs font-semibold uppercase tracking-wide text-white/70">Period</label>
-            <select
-              className={`${masterInputClass} max-w-[10rem] border-white/20 bg-white/10 text-white`}
+            <label className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">Period</label>
+            <MasterSelect
               value={period}
-              onChange={(e) => setPeriod(e.target.value as Period)}
-            >
-              <option value="7d" className="text-foreground">Last 7 days</option>
-              <option value="30d" className="text-foreground">Last 30 days</option>
-              <option value="90d" className="text-foreground">Last 90 days</option>
-              <option value="all" className="text-foreground">All time</option>
-            </select>
+              onValueChange={(value) => setPeriod(value as Period)}
+              className="max-w-[12rem] min-w-[11rem]"
+              aria-label="Analytics period"
+              options={[
+                { value: "7d", label: "Last 7 days" },
+                { value: "30d", label: "Last 30 days" },
+                { value: "90d", label: "Last 90 days" },
+                { value: "all", label: "All time" },
+              ]}
+            />
           </div>
         </MasterHero>
 

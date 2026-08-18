@@ -8,8 +8,6 @@ export const SITE_THEME_VERSION = "2";
 
 export const DEFAULT_SITE_THEME: SiteTheme = "dark";
 
-export const DASHBOARD_AUTO_REFRESH_MS = 30_000;
-
 export function getThemeInitScript() {
   return `(function(){try{var KEY="${SITE_THEME_KEY}";var VER_KEY="${SITE_THEME_VERSION_KEY}";var VER="${SITE_THEME_VERSION}";if(localStorage.getItem(VER_KEY)!==VER){localStorage.setItem(KEY,"dark");localStorage.setItem(VER_KEY,VER);document.documentElement.classList.add("dark");return;}var t=localStorage.getItem(KEY);if(t==="light"){document.documentElement.classList.remove("dark");}else{document.documentElement.classList.add("dark");if(!t)localStorage.setItem(KEY,"dark");}}catch(e){document.documentElement.classList.add("dark");}})();`;
 }

@@ -20,9 +20,9 @@ export default function CompanyRegisterPage() {
     const form = new FormData(e.currentTarget);
     const companyName = String(form.get("companyName") ?? "").trim();
     const companyDomain = String(form.get("companyDomain") ?? "").trim();
-    const companyEmail = String(form.get("companyEmail") ?? "").trim().toLowerCase();
-    const passcode = String(form.get("passcode") ?? "").trim();
-    const confirmPasscode = String(form.get("confirmPasscode") ?? "").trim();
+    const companyEmail = String(form.get("companyEmail") ?? "").replace(/\s+/g, "").toLowerCase();
+    const passcode = String(form.get("passcode") ?? "").replace(/\s+/g, "");
+    const confirmPasscode = String(form.get("confirmPasscode") ?? "").replace(/\s+/g, "");
     const honeypot = String(form.get("honeypot") ?? "").trim();
 
     if (!companyName || !companyDomain || !companyEmail || !passcode || !confirmPasscode) {
@@ -52,7 +52,7 @@ export default function CompanyRegisterPage() {
         setError(data.error ?? "Unable to register company.");
         return;
       }
-      router.push("/admin");
+      router.push("/admin/dashboard");
     } catch {
       setError("Unable to register right now. Please try again.");
     } finally {

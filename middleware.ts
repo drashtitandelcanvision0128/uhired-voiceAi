@@ -54,11 +54,11 @@ export async function middleware(request: NextRequest) {
     (pathname === "/company-login" || pathname === "/company-register") &&
     isCompanyAuthenticated
   ) {
-    return applySecurityHeaders(NextResponse.redirect(new URL("/admin", request.url)));
+    return applySecurityHeaders(NextResponse.redirect(new URL("/admin/dashboard", request.url)));
   }
 
   if (pathname === "/sessions" || pathname === "/profile") {
-    const destination = isCompanyAuthenticated ? "/admin" : "/company-login";
+    const destination = isCompanyAuthenticated ? "/admin/dashboard" : "/company-login";
     return applySecurityHeaders(NextResponse.redirect(new URL(destination, request.url)));
   }
 

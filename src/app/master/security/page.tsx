@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Search } from "lucide-react";
 import { MasterShell } from "@/components/master-shell";
 import {
   MASTER_PAGE_SIZE_OPTIONS,
@@ -14,6 +14,7 @@ import {
   MasterCard,
   MasterHero,
   MasterInlineKpi,
+  MasterSelect,
   masterBtnGhost,
   masterInputClass,
   masterTableHeadClass,
@@ -46,6 +47,9 @@ export default function MasterSecurityPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"" | "success" | "failed">("");
+  const [trustFilter, setTrustFilter] = useState<"" | "yes" | "no">("");
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<MasterPageSize>(MASTER_PAGE_SIZE_OPTIONS[0]);
 
@@ -55,6 +59,8 @@ export default function MasterSecurityPage() {
     try {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (filter) params.set("filter", filter);
+      if (trustFilter) params.set("trust", trustFilter);
+      if (appliedSearch) params.set("search", appliedSearch);
       const res = await fetch(`/api/master/security?${params.toString()}`);
       const payload = (await res.json()) as SecurityResponse & { error?: string };
       if (res.status === 401) {
@@ -69,7 +75,7 @@ export default function MasterSecurityPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, page, pageSize, filter]);
+  }, [router, page, pageSize, filter, trustFilter, appliedSearch]);
 
   useEffect(() => {
     void load();
@@ -77,7 +83,7 @@ export default function MasterSecurityPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [filter, pageSize]);
+  }, [filter, trustFilter, appliedSearch, pageSize]);
 
   return (
     <MasterShell
@@ -114,18 +120,51 @@ export default function MasterSecurityPage() {
         <MasterCard
           elevated
           title="Login events"
-          headerAction={
-            <select
-              value={filter}
-              onChange={(event) => setFilter(event.target.value as typeof filter)}
-              className={masterInputClass}
-            >
-              <option value="">All events</option>
-              <option value="success">Successful only</option>
-              <option value="failed">Failed only</option>
-            </select>
-          }
         >
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[14rem] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") setAppliedSearch(searchInput.trim());
+                }}
+                placeholder="Search email or IP..."
+                className={`${masterInputClass} w-full pl-10`}
+                aria-label="Search login events"
+              />
+            </div>
+            <MasterSelect
+              value={filter}
+              onValueChange={(value) => setFilter(value as typeof filter)}
+              className="min-w-[11rem]"
+              aria-label="Filter by result"
+              options={[
+                { value: "", label: "All events" },
+                { value: "success", label: "Successful only" },
+                { value: "failed", label: "Failed only" },
+              ]}
+            />
+            <MasterSelect
+              value={trustFilter}
+              onValueChange={(value) => setTrustFilter(value as typeof trustFilter)}
+              className="min-w-[11rem]"
+              aria-label="Filter by trusted device"
+              options={[
+                { value: "", label: "All devices" },
+                { value: "yes", label: "Trusted" },
+                { value: "no", label: "Not trusted" },
+              ]}
+            />
+            <button
+              type="button"
+              onClick={() => setAppliedSearch(searchInput.trim())}
+              className={`${masterBtnGhost} !px-4`}
+            >
+              Search
+            </button>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead>

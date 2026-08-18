@@ -153,7 +153,7 @@ const transcript = [
   {
     t: "01:31",
     who: "Candidate",
-    text: "We layered edge caching with token-bucket limits per tenant to protect downstream services.",
+    text: "We layered edge caching with token-bucket rate limits per company to protect downstream services.",
     conf: 96,
     key: true,
   },

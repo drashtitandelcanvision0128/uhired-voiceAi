@@ -84,7 +84,10 @@ model RequirementInvite {
   companyId     String
   company       Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   email         String
+  candidateName String?
+  source        String      @default("email")
   accessCode    String      @unique
+  scheduledAt   DateTime?
   emailSentAt   DateTime?
   expiresAt     DateTime
   usedAt        DateTime?

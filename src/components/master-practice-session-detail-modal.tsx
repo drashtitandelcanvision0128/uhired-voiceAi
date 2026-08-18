@@ -87,6 +87,7 @@ export function MasterPracticeSessionDetailModal({
       onClose={onClose}
       loading={loading}
       size="xl"
+      presentation="page"
       title="Practice session detail"
       subtitle={
         session

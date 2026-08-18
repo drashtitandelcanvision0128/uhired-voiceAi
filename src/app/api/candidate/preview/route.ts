@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { lookupInterviewByAccessCode } from "@/lib/interview-access-code";
-import { isInviteExpired } from "@/lib/requirement-invite-expiry";
+import { getInviteAccessState } from "@/lib/requirement-invite-expiry";
 import { prisma } from "@/lib/prisma";
 
 function maskEmail(email: string) {
@@ -27,10 +27,11 @@ export async function GET(request: Request) {
 
   const { invite, requirement } = await lookupInterviewByAccessCode(code);
 
-  if (!requirement) {
+  if (!requirement || !invite) {
     return NextResponse.json({
       valid: false,
-      error: "We could not find that interview code.",
+      error:
+        "We could not find that interview code. Use the personal link from your interview email — not the apply link.",
     });
   }
 
@@ -40,7 +41,8 @@ export async function GET(request: Request) {
   });
 
   const roleTitle = requirement.title?.trim() || requirement.domain;
-  const expired = invite ? isInviteExpired(invite.expiresAt) : false;
+  const access = getInviteAccessState(invite);
+  const expired = !access.allowed && access.reason === "expired";
   const companyName = companyDisplayName(company);
 
   if (invite?.usedAt) {
@@ -63,16 +65,18 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
-    valid: !expired,
+    valid: access.allowed,
     expired,
     companyName,
     brandColor: company?.brandPrimaryColor ?? null,
     logoUrl: company?.brandLogoUrl ?? null,
     roleTitle,
     durationMin: requirement.durationMin,
-    expiresAt: invite?.expiresAt?.toISOString() ?? null,
-    emailHint: invite?.email ? maskEmail(invite.email) : null,
+    scheduledAt: invite.scheduledAt?.toISOString() ?? null,
+    opensAt: !access.allowed && access.opensAt ? access.opensAt.toISOString() : null,
+    expiresAt: invite.expiresAt?.toISOString() ?? null,
+    emailHint: invite.email ? maskEmail(invite.email) : null,
     interviewLanguage: requirement.interviewLanguage ?? null,
-    error: expired ? "This interview invite has expired. Ask the company to send a new invite." : null,
+    error: access.allowed ? null : access.message,
   });
 }

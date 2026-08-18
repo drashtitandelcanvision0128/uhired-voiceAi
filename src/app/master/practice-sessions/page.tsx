@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Activity, CreditCard, RefreshCw, ScrollText, Search, TrendingUp, X } from "lucide-react";
+import { Activity, CreditCard, Eye, RefreshCw, ScrollText, Search, TrendingUp, X } from "lucide-react";
 import { useConfirm, useToast } from "@/components/app-feedback";
 import { MasterShell } from "@/components/master-shell";
 import {
@@ -16,11 +16,11 @@ import {
   MasterCard,
   MasterHero,
   MasterKpiCard,
+  MasterSelect,
   masterBtnGhost,
   masterBtnPrimary,
   masterInputClass,
-  masterRowActionClass,
-  masterRowActionDangerClass,
+  MasterRowActionsMenu,
   masterTableHeadClass,
 } from "@/components/master-ui";
 
@@ -247,51 +247,6 @@ export default function MasterPracticeSessionsPage() {
 
   useEffect(() => {
     void load();
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-
-    const startPolling = () => {
-      if (intervalId) {
-        return;
-      }
-      intervalId = setInterval(() => {
-        void load();
-      }, 30000);
-    };
-
-    const stopPolling = () => {
-      if (!intervalId) {
-        return;
-      }
-      clearInterval(intervalId);
-      intervalId = null;
-    };
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void load();
-        startPolling();
-      } else {
-        stopPolling();
-      }
-    };
-
-    const onFocus = () => {
-      void load();
-      startPolling();
-    };
-
-    if (document.visibilityState === "visible") {
-      startPolling();
-    }
-
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("focus", onFocus);
-
-    return () => {
-      stopPolling();
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("focus", onFocus);
-    };
   }, [load]);
 
   async function deleteSession(sessionId: string) {
@@ -331,8 +286,8 @@ export default function MasterPracticeSessionsPage() {
 
   return (
     <MasterShell
-      title="Session Intelligence"
-      subtitle="Monitor, analyze, and manage real-time candidate practice sessions."
+      title="Practice Interviews"
+      subtitle="Monitor, analyze, and manage candidate practice interviews in real time."
       topActions={
         <button
           type="button"
@@ -347,9 +302,20 @@ export default function MasterPracticeSessionsPage() {
       <div className="space-y-5">
         {error ? <MasterAlert variant="error">{error}</MasterAlert> : null}
 
+        {details !== null || detailsLoadingId !== null ? (
+          <MasterPracticeSessionDetailModal
+            open
+            loading={detailsLoadingId !== null && details === null}
+            session={details}
+            onClose={closeDetails}
+            onDelete={(sessionId) => void deleteSession(sessionId)}
+            deleteBusy={details !== null && deleteLoadingId === details.id}
+          />
+        ) : (
+        <>
         <MasterHero
-          badge="Session intelligence"
-          title="Practice session monitoring"
+          badge="Practice interviews"
+          title="Practice interview monitoring"
           subtitle="Track candidate performance, revenue, and live session activity across all practice interviews."
         />
 
@@ -382,7 +348,7 @@ export default function MasterPracticeSessionsPage() {
 
         <MasterCard elevated title="Practice sessions" subtitle="Filter by candidate, status, payment, track, date, or score.">
           <div className="mb-4 rounded-xl border border-border bg-surface/40 p-4 sm:p-5">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:items-end">
               <label className="block space-y-1.5">
                 <span className="admin-label">Search sessions</span>
                 <div className="relative">
@@ -404,38 +370,46 @@ export default function MasterPracticeSessionsPage() {
 
               <label className="block space-y-1.5">
                 <span className="admin-label">Status</span>
-                <select
+                <MasterSelect
                   value={statusInput}
-                  onChange={(event) =>
-                    setStatusInput(event.target.value as "" | "READY" | "LIVE" | "COMPLETED")
+                  onValueChange={(value) =>
+                    setStatusInput(value as "" | "READY" | "LIVE" | "COMPLETED")
                   }
-                  className={`${masterInputClass} w-full`}
-                >
-                  <option value="">All statuses</option>
-                  <option value="LIVE">LIVE</option>
-                  <option value="READY">READY</option>
-                  <option value="COMPLETED">COMPLETED</option>
-                </select>
+                  className="w-full"
+                  aria-label="Filter by status"
+                  options={[
+                    { value: "", label: "All statuses" },
+                    { value: "LIVE", label: "LIVE" },
+                    { value: "READY", label: "READY" },
+                    { value: "COMPLETED", label: "COMPLETED" },
+                  ]}
+                />
               </label>
 
               <label className="block space-y-1.5">
                 <span className="admin-label">Payment</span>
-                <select
+                <MasterSelect
                   value={paymentInput}
-                  onChange={(event) =>
-                    setPaymentInput(event.target.value as "" | "PAID" | "PROMO" | "UNPAID")
+                  onValueChange={(value) =>
+                    setPaymentInput(value as "" | "PAID" | "PROMO" | "UNPAID")
                   }
-                  className={`${masterInputClass} w-full`}
-                >
-                  <option value="">All payments</option>
-                  <option value="PAID">Paid</option>
-                  <option value="PROMO">Promo</option>
-                  <option value="UNPAID">Unpaid</option>
-                </select>
+                  className="w-full"
+                  aria-label="Filter by payment"
+                  options={[
+                    { value: "", label: "All payments" },
+                    { value: "PAID", label: "Paid" },
+                    { value: "PROMO", label: "Promo" },
+                    { value: "UNPAID", label: "Unpaid" },
+                  ]}
+                />
               </label>
 
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={applyFilters} className={`${masterBtnPrimary} inline-flex items-center gap-2 !px-5`}>
+              <div className="flex items-end gap-2">
+                <button
+                  type="button"
+                  onClick={applyFilters}
+                  className={`${masterBtnPrimary} inline-flex h-[2.75rem] flex-1 items-center justify-center gap-2 !px-4`}
+                >
                   <Search className="h-4 w-4" aria-hidden="true" />
                   Search
                 </button>
@@ -443,16 +417,14 @@ export default function MasterPracticeSessionsPage() {
                   <button
                     type="button"
                     onClick={clearFilters}
-                    className={`${masterBtnGhost} inline-flex items-center gap-2 !px-4`}
+                    className={`${masterBtnGhost} inline-flex h-[2.75rem] items-center justify-center gap-2 !px-4`}
                   >
                     <X className="h-4 w-4" aria-hidden="true" />
                     Clear
                   </button>
                 ) : null}
               </div>
-            </div>
 
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <label className="block space-y-1.5">
                 <span className="admin-label">Track / domain</span>
                 <input
@@ -462,6 +434,7 @@ export default function MasterPracticeSessionsPage() {
                   className={`${masterInputClass} w-full`}
                 />
               </label>
+
               <label className="block space-y-1.5">
                 <span className="admin-label">From date</span>
                 <input
@@ -471,6 +444,7 @@ export default function MasterPracticeSessionsPage() {
                   className={`${masterInputClass} w-full`}
                 />
               </label>
+
               <label className="block space-y-1.5">
                 <span className="admin-label">To date</span>
                 <input
@@ -480,8 +454,9 @@ export default function MasterPracticeSessionsPage() {
                   className={`${masterInputClass} w-full`}
                 />
               </label>
+
               <div className="grid grid-cols-2 gap-3">
-                <label className="block space-y-1.5">
+                <label className="block min-w-0 space-y-1.5">
                   <span className="admin-label">Min score</span>
                   <input
                     type="number"
@@ -493,7 +468,7 @@ export default function MasterPracticeSessionsPage() {
                     className={`${masterInputClass} w-full`}
                   />
                 </label>
-                <label className="block space-y-1.5">
+                <label className="block min-w-0 space-y-1.5">
                   <span className="admin-label">Max score</span>
                   <input
                     type="number"
@@ -591,8 +566,7 @@ export default function MasterPracticeSessionsPage() {
                   <th className="pr-3">Duration</th>
                   <th className="pr-3">AI Score</th>
                   <th className="pr-3">Payment</th>
-                  <th className="pr-3">Details</th>
-                  <th>Delete</th>
+                  <th className="w-10 text-right"> </th>
                 </tr>
               </thead>
               <tbody>
@@ -626,23 +600,24 @@ export default function MasterPracticeSessionsPage() {
                         {row.paymentType}
                       </span>
                     </td>
-                    <td className="pr-3">
-                      <button
-                        type="button"
-                        onClick={() => void viewDetails(row.id)}
-                        className={masterRowActionClass}
-                      >
-                        {detailsLoadingId === row.id ? "Loading..." : "View"}
-                      </button>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        onClick={() => void deleteSession(row.id)}
-                        className={masterRowActionDangerClass}
-                      >
-                        {deleteLoadingId === row.id ? "Deleting..." : "Delete"}
-                      </button>
+                    <td className="text-right">
+                      <MasterRowActionsMenu
+                        label={row.candidateName}
+                        actions={[
+                          {
+                            label: detailsLoadingId === row.id ? "Loading..." : "View",
+                            icon: Eye,
+                            onClick: () => void viewDetails(row.id),
+                            disabled: detailsLoadingId === row.id,
+                          },
+                          {
+                            label: deleteLoadingId === row.id ? "Deleting..." : "Delete",
+                            onClick: () => void deleteSession(row.id),
+                            danger: true,
+                            disabled: deleteLoadingId === row.id,
+                          },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -661,15 +636,8 @@ export default function MasterPracticeSessionsPage() {
             }}
           />
         </MasterCard>
-
-        <MasterPracticeSessionDetailModal
-          open={details !== null || detailsLoadingId !== null}
-          loading={detailsLoadingId !== null && details === null}
-          session={details}
-          onClose={closeDetails}
-          onDelete={(sessionId) => void deleteSession(sessionId)}
-          deleteBusy={details !== null && deleteLoadingId === details.id}
-        />
+        </>
+        )}
       </div>
     </MasterShell>
   );

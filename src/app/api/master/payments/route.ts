@@ -12,8 +12,24 @@ export async function GET(request: Request) {
     const page = Math.max(1, Number(url.searchParams.get("page") ?? "1") || 1);
     const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get("pageSize") ?? "10") || 10));
     const status = url.searchParams.get("status")?.trim().toUpperCase();
+    const search = url.searchParams.get("search")?.trim() ?? "";
 
-    const where = status && status !== "ALL" ? { status: status as "CREATED" | "VERIFIED" | "FAILED" } : {};
+    const where: {
+      status?: "CREATED" | "VERIFIED" | "FAILED";
+      OR?: Array<Record<string, { contains: string; mode: "insensitive" }>>;
+    } = {};
+    if (status && status !== "ALL" && (status === "CREATED" || status === "VERIFIED" || status === "FAILED")) {
+      where.status = status;
+    }
+    if (search) {
+      where.OR = [
+        { candidateName: { contains: search, mode: "insensitive" } },
+        { candidateEmail: { contains: search, mode: "insensitive" } },
+        { orderId: { contains: search, mode: "insensitive" } },
+        { domain: { contains: search, mode: "insensitive" } },
+        { promoCode: { contains: search, mode: "insensitive" } },
+      ];
+    }
 
     const [payments, total, verifiedAgg, failedCount, createdCount] = await Promise.all([
       prisma.practicePayment.findMany({

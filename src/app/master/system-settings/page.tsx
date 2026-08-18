@@ -31,6 +31,7 @@ import {
   MasterHero,
   MasterInfoCard,
   MasterKpiCard,
+  MasterSelect,
   masterBtnGhost,
   masterBtnPrimary,
   masterInputClass,
@@ -436,17 +437,19 @@ export default function MasterSystemSettingsPage() {
 
               <label className="block space-y-1.5">
                 <span className="admin-label">Status</span>
-                <select
+                <MasterSelect
                   value={statusInput}
-                  onChange={(event) => setStatusInput(event.target.value as "ALL" | SettingStatus)}
-                  className={`${masterInputClass} w-full`}
-                >
-                  <option value="ALL">All statuses</option>
-                  <option value="configured">Configured</option>
-                  <option value="missing">Missing</option>
-                  <option value="warning">Needs attention</option>
-                  <option value="optional">Optional</option>
-                </select>
+                  onValueChange={(value) => setStatusInput(value as "ALL" | SettingStatus)}
+                  className="w-full"
+                  aria-label="Filter by status"
+                  options={[
+                    { value: "ALL", label: "All statuses" },
+                    { value: "configured", label: "Configured" },
+                    { value: "missing", label: "Missing" },
+                    { value: "warning", label: "Needs attention" },
+                    { value: "optional", label: "Optional" },
+                  ]}
+                />
               </label>
 
               <div className="flex flex-wrap gap-2">

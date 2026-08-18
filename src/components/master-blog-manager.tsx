@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { ExternalLink } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ExternalLink, Search } from "lucide-react";
 import { useConfirm, useToast } from "@/components/app-feedback";
-import { MasterAlert, MasterCard, masterBtnPrimary, masterInputClass } from "@/components/master-ui";
+import { MasterAlert, MasterCard, MasterRowActionsMenu, MasterSelect, masterBtnPrimary, masterInputClass } from "@/components/master-ui";
 import { normalizeCoverImageUrl, resolvePublicAssetUrl } from "@/lib/public-asset-url";
 
 type BlogPost = {
@@ -46,6 +46,8 @@ export function MasterBlogManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [postSearch, setPostSearch] = useState("");
+  const [publishFilter, setPublishFilter] = useState<"ALL" | "published" | "draft">("ALL");
 
   const loadPosts = useCallback(async () => {
     setLoading(true);
@@ -61,6 +63,16 @@ export function MasterBlogManager() {
       setLoading(false);
     }
   }, []);
+
+  const filteredPosts = useMemo(() => {
+    const query = postSearch.trim().toLowerCase();
+    return posts.filter((post) => {
+      if (publishFilter === "published" && !post.isPublished) return false;
+      if (publishFilter === "draft" && post.isPublished) return false;
+      if (!query) return true;
+      return `${post.title} ${post.slug ?? ""} ${post.excerpt ?? ""}`.toLowerCase().includes(query);
+    });
+  }, [posts, postSearch, publishFilter]);
 
   useEffect(() => {
     void loadPosts();
@@ -286,16 +298,44 @@ export function MasterBlogManager() {
       </MasterCard>
 
       <MasterCard className="p-6">
-        <h2 className="font-bold text-lg mb-4">All blog posts ({posts.length})</h2>
+        <h2 className="mb-4 font-bold text-lg">All blog posts ({filteredPosts.length})</h2>
+        {posts.length > 0 ? (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[12rem] flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={postSearch}
+                onChange={(event) => setPostSearch(event.target.value)}
+                placeholder="Search title or slug"
+                className={`${masterInputClass} h-8 w-full pl-8 text-sm`}
+                aria-label="Search blog posts"
+              />
+            </div>
+            <MasterSelect
+              value={publishFilter}
+              onValueChange={(value) => setPublishFilter(value as typeof publishFilter)}
+              size="sm"
+              className="min-w-[9.5rem]"
+              aria-label="Filter by publish status"
+              options={[
+                { value: "ALL", label: "All posts" },
+                { value: "published", label: "Published" },
+                { value: "draft", label: "Drafts" },
+              ]}
+            />
+          </div>
+        ) : null}
         {loading ? (
           <p className="text-sm text-slate-500">Loading…</p>
         ) : posts.length === 0 ? (
           <p className="text-sm text-slate-500">
             No blog posts yet. Create one above — it will appear on /blog when published.
           </p>
+        ) : filteredPosts.length === 0 ? (
+          <p className="text-sm text-slate-500">No posts match these filters.</p>
         ) : (
           <ul className="space-y-4">
-            {posts.map((post) => (
+            {filteredPosts.map((post) => (
               <li key={post.id} className="rounded-lg border border-slate-200 p-4">
                 {editingId === post.id ? (
                   <div className="space-y-3">
@@ -392,37 +432,28 @@ export function MasterBlogManager() {
                         <p className="mt-2 text-sm text-slate-600 line-clamp-2">{post.excerpt}</p>
                       ) : null}
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {post.isPublished && post.slug ? (
-                        <Link
-                          href={`/blog/${post.slug}`}
-                          target="_blank"
-                          className="text-sm font-medium text-emerald-700 hover:underline"
-                        >
-                          View
-                        </Link>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-slate-700"
-                        onClick={() => startEdit(post)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-slate-700"
-                        onClick={() => void togglePublish(post)}
-                      >
-                        {post.isPublished ? "Unpublish" : "Publish"}
-                      </button>
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-red-600"
-                        onClick={() => void deletePost(post.id)}
-                      >
-                        Delete
-                      </button>
+                    <div className="flex items-start justify-end">
+                      <MasterRowActionsMenu
+                        label={post.title}
+                        actions={[
+                          post.isPublished && post.slug
+                            ? {
+                                label: "View",
+                                onClick: () => window.open(`/blog/${post.slug}`, "_blank"),
+                              }
+                            : null,
+                          { label: "Edit", onClick: () => startEdit(post) },
+                          {
+                            label: post.isPublished ? "Unpublish" : "Publish",
+                            onClick: () => void togglePublish(post),
+                          },
+                          {
+                            label: "Delete",
+                            onClick: () => void deletePost(post.id),
+                            danger: true,
+                          },
+                        ]}
+                      />
                     </div>
                   </div>
                 )}

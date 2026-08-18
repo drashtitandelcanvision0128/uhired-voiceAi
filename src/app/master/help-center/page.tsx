@@ -48,7 +48,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
       {
         question: "How do I log in to the master dashboard?",
         answer:
-          "Go to /master-login and sign in with your master admin email and password. After login you land on the Dashboard. Use the left sidebar to jump between Companies, Practice Sessions, Promo Codes, User Analytics, System Settings, and Reports.",
+          "Go to /master-login and sign in with your master admin email and password. After login you land on the Dashboard. Use the left sidebar to jump between Companies, Practice Interviews, Promo Codes, User Analytics, System Settings, and Reports.",
       },
       {
         question: "What is the difference between Dashboard, Logs, Support, and Help Center?",
@@ -72,7 +72,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
       {
         question: "How is a new company added?",
         answer:
-          "Companies are created when an employer signs up through the company login flow or when you provision them manually. The Companies page lists every tenant with domain, admin email, active status, and session count.",
+          "Companies are created when an employer signs up through the company login flow or when you provision them manually. The Companies page lists every company with domain, admin email, active status, and interview count.",
       },
       {
         question: "A company shows as inactive — what should I do?",
@@ -96,12 +96,12 @@ const HELP_CATEGORIES: HelpCategory[] = [
       {
         question: "A LIVE session is stuck — what should I check?",
         answer:
-          "Open Practice Sessions, set the Status filter to LIVE, and click Search. Check the candidate email and domain. If scoring is pending, wait for the scorecard job or check Logs for errors. Very old LIVE rows may need cleanup from Stuck Sessions.",
+          "Open Practice Interviews, set the Status filter to LIVE, and click Search. Check the candidate email and domain. If scoring is pending, wait for the scorecard job or check Logs for errors. Very old LIVE rows may need cleanup from Stuck Interviews.",
       },
       {
         question: "How do I track promo code redemptions?",
         answer:
-          "Practice Sessions show whether a session used a promo code or payment. Reports also include promo redemption counts and active promo codes for the selected period.",
+          "The Practice Interviews page shows whether an interview used a promo code or payment. Reports also include promo redemption counts and active promo codes for the selected period.",
       },
     ],
   },
@@ -207,7 +207,7 @@ const QUICK_LINKS = [
   { label: "Payments", href: "/master/payments", icon: CreditCard },
   { label: "Security", href: "/master/security", icon: Shield },
   { label: "Companies", href: "/master/companies", icon: Building2 },
-  { label: "Practice Sessions", href: "/master/practice-sessions", icon: ScrollText },
+  { label: "Practice Interviews", href: "/master/practice-sessions", icon: ScrollText },
   { label: "Promo Codes", href: "/master/promo-codes", icon: TicketPercent },
   { label: "User Analytics", href: "/master/user-analytics", icon: BarChart3 },
   { label: "System Settings", href: "/master/system-settings", icon: Settings },

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Search } from "lucide-react";
 import { useConfirm, useToast } from "@/components/app-feedback";
 import { MasterShell } from "@/components/master-shell";
 import {
@@ -15,11 +15,11 @@ import {
   MasterCard,
   MasterHero,
   MasterInlineKpi,
+  MasterSelect,
   masterBtnGhost,
   masterBtnPrimary,
   masterInputClass,
-  masterRowActionClass,
-  masterRowActionDangerClass,
+  MasterRowActionsMenu,
   masterTableHeadClass,
 } from "@/components/master-ui";
 
@@ -77,6 +77,8 @@ export default function MasterPaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | "VERIFIED" | "FAILED" | "CREATED">("");
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<MasterPageSize>(MASTER_PAGE_SIZE_OPTIONS[0]);
 
@@ -86,6 +88,7 @@ export default function MasterPaymentsPage() {
     try {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (statusFilter) params.set("status", statusFilter);
+      if (appliedSearch) params.set("search", appliedSearch);
       const res = await fetch(`/api/master/payments?${params.toString()}`);
       const payload = (await res.json()) as PaymentsResponse & { error?: string };
       if (res.status === 401) {
@@ -100,7 +103,7 @@ export default function MasterPaymentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, page, pageSize, statusFilter]);
+  }, [router, page, pageSize, statusFilter, appliedSearch]);
 
   useEffect(() => {
     void load();
@@ -108,7 +111,7 @@ export default function MasterPaymentsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, pageSize]);
+  }, [statusFilter, appliedSearch, pageSize]);
 
   useEffect(() => {
     if (!success) return;
@@ -200,19 +203,41 @@ export default function MasterPaymentsPage() {
         <MasterCard
           elevated
           title="Payment transactions"
-          headerAction={
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
-              className={masterInputClass}
-            >
-              <option value="">All statuses</option>
-              <option value="VERIFIED">Verified</option>
-              <option value="FAILED">Failed</option>
-              <option value="CREATED">Pending</option>
-            </select>
-          }
         >
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[14rem] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") setAppliedSearch(searchInput.trim());
+                }}
+                placeholder="Search name, email, order, or promo..."
+                className={`${masterInputClass} w-full pl-10`}
+                aria-label="Search payments"
+              />
+            </div>
+            <MasterSelect
+              value={statusFilter}
+              onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}
+              className="min-w-[11rem]"
+              aria-label="Filter by status"
+              options={[
+                { value: "", label: "All statuses" },
+                { value: "VERIFIED", label: "Verified" },
+                { value: "FAILED", label: "Failed" },
+                { value: "CREATED", label: "Pending" },
+              ]}
+            />
+            <button
+              type="button"
+              onClick={() => setAppliedSearch(searchInput.trim())}
+              className={`${masterBtnPrimary} !px-4`}
+            >
+              Search
+            </button>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead>
@@ -244,49 +269,42 @@ export default function MasterPaymentsPage() {
                     <td className="pr-4 text-slate-600">{payment.domain}</td>
                     <td className="pr-4 font-mono text-xs text-slate-500">{payment.orderId}</td>
                     <td className="pr-4 text-xs text-slate-500">{new Date(payment.createdAt).toLocaleString()}</td>
-                    <td>
-                      <div className="flex flex-wrap gap-2">
-                        {payment.status === "CREATED" ? (
-                          <button
-                            type="button"
-                            disabled={actionId === payment.id}
-                            onClick={() => void runPaymentAction(payment.id, "verify")}
-                            className={masterRowActionClass}
-                          >
-                            Verify
-                          </button>
-                        ) : null}
-                        {payment.status === "VERIFIED" ? (
-                          <button
-                            type="button"
-                            disabled={actionId === payment.id}
-                            onClick={() => void runPaymentAction(payment.id, "refund")}
-                            className={masterRowActionDangerClass}
-                          >
-                            Refund
-                          </button>
-                        ) : null}
-                        {payment.status === "FAILED" ? (
-                          <button
-                            type="button"
-                            disabled={actionId === payment.id}
-                            onClick={() => void runPaymentAction(payment.id, "retry")}
-                            className={masterRowActionClass}
-                          >
-                            Retry
-                          </button>
-                        ) : null}
-                        {payment.status !== "FAILED" && payment.status !== "REFUNDED" ? (
-                          <button
-                            type="button"
-                            disabled={actionId === payment.id}
-                            onClick={() => void runPaymentAction(payment.id, "mark_failed")}
-                            className={masterRowActionDangerClass}
-                          >
-                            Fail
-                          </button>
-                        ) : null}
-                      </div>
+                    <td className="text-right">
+                      <MasterRowActionsMenu
+                        label={payment.candidateName}
+                        actions={[
+                          payment.status === "CREATED"
+                            ? {
+                                label: "Verify",
+                                onClick: () => void runPaymentAction(payment.id, "verify"),
+                                disabled: actionId === payment.id,
+                              }
+                            : null,
+                          payment.status === "VERIFIED"
+                            ? {
+                                label: "Refund",
+                                onClick: () => void runPaymentAction(payment.id, "refund"),
+                                danger: true,
+                                disabled: actionId === payment.id,
+                              }
+                            : null,
+                          payment.status === "FAILED"
+                            ? {
+                                label: "Retry",
+                                onClick: () => void runPaymentAction(payment.id, "retry"),
+                                disabled: actionId === payment.id,
+                              }
+                            : null,
+                          payment.status !== "FAILED" && payment.status !== "REFUNDED"
+                            ? {
+                                label: "Fail",
+                                onClick: () => void runPaymentAction(payment.id, "mark_failed"),
+                                danger: true,
+                                disabled: actionId === payment.id,
+                              }
+                            : null,
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}

@@ -280,7 +280,13 @@ export async function POST(request: Request) {
         accessCode = await generateUniqueCandidateInviteCode(authCompany.companyName);
         await prisma.requirementInvite.update({
           where: { id: existingInvite.id },
-          data: { accessCode, expiresAt: inviteExpiresAt, usedAt: null },
+          data: {
+            accessCode,
+            source: "email",
+            scheduledAt: null,
+            expiresAt: inviteExpiresAt,
+            usedAt: null,
+          },
         });
       } else {
         accessCode = await generateUniqueCandidateInviteCode(authCompany.companyName);
@@ -289,6 +295,7 @@ export async function POST(request: Request) {
             requirementId: requirement.id,
             companyId: authCompany.companyId,
             email,
+            source: "email",
             accessCode,
             expiresAt: inviteExpiresAt,
           },

@@ -224,7 +224,7 @@ export default function MasterProfilePage() {
 
           <div className="flex flex-col gap-4">
             <div className="admin-hero relative overflow-hidden rounded-2xl p-5 sm:p-6">
-              <p className="text-sm leading-relaxed text-white/85">
+              <p className="text-muted-foreground text-sm leading-relaxed">
                 This account controls the entire Uhired platform — companies, sessions, payments, and system
                 settings.
               </p>
@@ -235,10 +235,10 @@ export default function MasterProfilePage() {
                   "Review login history under Security after any change.",
                 ].map((tip) => (
                   <li key={tip} className="flex items-start gap-2.5">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25">
+                    <span className="bg-muted ring-border mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ring-1">
                       <Check className="h-3 w-3 text-cyan" strokeWidth={3} aria-hidden />
                     </span>
-                    <span className="text-sm leading-relaxed text-white/90">{tip}</span>
+                    <span className="text-sm leading-relaxed text-foreground">{tip}</span>
                   </li>
                 ))}
               </ul>

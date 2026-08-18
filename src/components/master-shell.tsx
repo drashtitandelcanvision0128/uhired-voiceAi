@@ -12,6 +12,7 @@ import {
   FileBarChart,
   FileText,
   LayoutDashboard,
+  Plus,
   LifeBuoy,
   LogOut,
   Newspaper,
@@ -22,9 +23,9 @@ import {
   TicketPercent,
   User,
 } from "lucide-react";
+import { AppShell } from "@/components/dashboard/app-shell";
 import { MasterGlobalSearch } from "@/components/master-global-search";
 import { MasterHeaderControls } from "@/components/master-header-controls";
-import { AdminPortalLogo } from "@/components/admin-portal-logo";
 
 type MasterShellProps = {
   title: string;
@@ -38,13 +39,13 @@ const platformNavItems = [
   { href: "/master/companies", label: "Company Management", icon: Building2 },
   { href: "/master/company-sessions", label: "Company Interviews", icon: Briefcase },
   { href: "/master/interview-analytics", label: "Interview Analytics", icon: BarChart3 },
-  { href: "/master/practice-sessions", label: "Practice Sessions", icon: ScrollText },
-  { href: "/master/stuck-sessions", label: "Stuck Sessions", icon: AlertTriangle },
+  { href: "/master/practice-sessions", label: "Practice Interviews", icon: ScrollText },
+  { href: "/master/stuck-sessions", label: "Stuck Interviews", icon: AlertTriangle },
   { href: "/master/payments", label: "Payments", icon: CreditCard },
   { href: "/master/promo-codes", label: "Promo Codes", icon: TicketPercent },
   { href: "/master/user-analytics", label: "User Analytics", icon: BarChart3 },
   { href: "/master/blog", label: "Blog", icon: Newspaper },
-  { href: "/master/content", label: "Careers CMS", icon: ClipboardList },
+  { href: "/master/content", label: "Careers Pages", icon: ClipboardList },
 ];
 
 const systemNavItems = [
@@ -66,127 +67,90 @@ export function MasterShell({ title, subtitle, children, topActions }: MasterShe
     router.push("/master-login");
   }
 
-  function renderNavItem(item: (typeof platformNavItems)[number]) {
-    const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-    return (
-      <Link
-        key={item.href}
-        href={item.href}
-        className={`admin-nav-item flex items-center gap-3 px-3 py-2.5 text-sm font-semibold no-underline ${
-          active
-            ? "admin-nav-item-active"
-            : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
-        }`}
-      >
-        <item.icon className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden="true" />
-        <span className="flex-1">{item.label}</span>
-      </Link>
-    );
+  function isActive(href: string) {
+    return pathname === href || pathname.startsWith(`${href}/`);
   }
 
   return (
-    <div className="admin-shell master-shell relative flex min-h-screen flex-col lg:flex-row">
-      <aside className="admin-sidebar z-30 flex w-full flex-col overflow-y-auto border-b p-5 lg:fixed lg:left-0 lg:top-0 lg:h-screen lg:w-[17rem] lg:border-b-0 lg:border-r">
-        <div className="mb-6 px-1">
-          <AdminPortalLogo subtitle="Master Control · Superadmin" />
-        </div>
-
-        <nav className="flex flex-1 flex-col gap-5">
-          <div>
-            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-              Platform
-            </p>
-            <div className="flex flex-col gap-0.5">{platformNavItems.map(renderNavItem)}</div>
+    <AppShell
+      className="master-shell"
+      brandTitle="Uhired"
+      brandSubtitle="Master Control"
+      headerTitle={title}
+      headerSubtitle={subtitle}
+      headerSearch={<MasterGlobalSearch />}
+      headerActions={<MasterHeaderControls onLogout={logout} middleActions={topActions} />}
+      primaryAction={{
+        label: "Generate Report",
+        href: "/master/reports",
+        icon: Plus,
+      }}
+      secondaryAction={{
+        label: "Support",
+        href: "/master/support",
+        icon: LifeBuoy,
+      }}
+      navGroups={[
+        {
+          items: platformNavItems.map((item) => ({
+            key: item.href,
+            label: item.label,
+            icon: item.icon,
+            href: item.href,
+            active: isActive(item.href),
+          })),
+        },
+        {
+          label: "Operations",
+          items: systemNavItems.map((item) => ({
+            key: item.href,
+            label: item.label,
+            icon: item.icon,
+            href: item.href,
+            active: isActive(item.href),
+          })),
+        },
+      ]}
+      sidebarFooter={
+        <div className="flex items-center gap-2 rounded-lg px-2 py-2">
+          <div className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
+            M
           </div>
-
-          <div>
-            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-              System
-            </p>
-            <div className="flex flex-col gap-0.5">{systemNavItems.map(renderNavItem)}</div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">Master Admin</p>
+            <p className="text-muted-foreground truncate text-xs">Platform Super Admin</p>
           </div>
-        </nav>
-
-        <Link href="/master/reports" className="admin-btn-primary mb-3 mt-4 w-full py-3 no-underline">
-          <FileBarChart className="h-4 w-4" aria-hidden="true" />
-          Generate Report
-        </Link>
-
-        <div className="mt-auto space-y-3 border-t border-white/10 pt-5">
-          <Link
-            href="/master/help-center"
-            className="mb-1 block py-1 text-center text-sm font-medium text-slate-400 no-underline transition hover:text-slate-200"
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="text-muted-foreground hover:bg-sidebar-accent hover:text-foreground rounded-md p-1.5"
+            aria-label="Logout"
+            title="Logout"
           >
-            Help Center
-          </Link>
-          <div className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2.5 ring-1 ring-white/10 backdrop-blur-sm">
-            <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-primary-foreground"
-              style={{ background: "var(--gradient-brand)" }}
-              aria-hidden
-            >
-              M
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">Master Admin</p>
-              <p className="text-[11px] text-slate-400">Platform superadmin</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => void logout()}
-              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
-              aria-label="Logout"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
+            <LogOut className="size-4" aria-hidden="true" />
+          </button>
         </div>
-      </aside>
-
-      <div className="flex min-h-screen flex-1 flex-col lg:ml-[17rem]">
-        <header className="admin-header sticky top-0 z-20 border-b px-5 sm:px-10">
-          <div className="flex h-[4.25rem] items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="font-display truncate text-2xl font-extrabold tracking-tight text-foreground">
-                {title}
-              </h1>
-              <p className="truncate text-xs font-medium text-muted-foreground">{subtitle}</p>
-            </div>
-            <MasterHeaderControls onLogout={logout} middleActions={topActions} />
-          </div>
-          <div className="pb-4 lg:hidden">
-            <MasterGlobalSearch />
-          </div>
-        </header>
-
-        <div className="mx-auto w-full max-w-[76rem] flex-1 space-y-6 p-5 sm:p-8">
-          <div className="hidden lg:block">
-            <MasterGlobalSearch />
-          </div>
-          {children}
-        </div>
-
-        <footer className="admin-footer mt-auto border-t py-8">
-          <div className="mx-auto flex max-w-[76rem] flex-col items-center justify-between gap-4 px-8 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground md:flex-row">
+      }
+      footer={
+        <footer className="admin-footer mt-auto border-t py-4">
+          <div className="text-muted-foreground mx-auto flex max-w-[100rem] flex-col items-center justify-between gap-3 px-4 text-xs sm:flex-row sm:px-6">
             <span>© 2026 UHIRED. All rights reserved.</span>
-            <div className="flex flex-wrap justify-center gap-6">
-              <a href="/privacy" className="no-underline transition-colors hover:text-foreground">
+            <div className="flex flex-wrap justify-center gap-4">
+              <a href="/privacy" className="hover:text-foreground no-underline">
                 Privacy Policy
               </a>
-              <a href="/terms" className="no-underline transition-colors hover:text-foreground">
+              <a href="/terms" className="hover:text-foreground no-underline">
                 Terms of Service
               </a>
-              <Link
-                href="/master/security"
-                className="font-bold text-foreground no-underline hover:underline"
-              >
+              <Link href="/master/security" className="hover:text-foreground font-medium no-underline">
                 Security
               </Link>
             </div>
           </div>
         </footer>
-      </div>
-    </div>
+      }
+    >
+      {children}
+    </AppShell>
   );
 }

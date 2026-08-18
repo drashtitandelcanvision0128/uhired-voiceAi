@@ -26,6 +26,8 @@ type InvitePreview = {
   logoUrl?: string | null;
   roleTitle?: string;
   durationMin?: number;
+  scheduledAt?: string | null;
+  opensAt?: string | null;
   expiresAt?: string | null;
   emailHint?: string | null;
   error?: string | null;
@@ -154,7 +156,7 @@ export default function CandidatePage() {
               Interview room access
             </span>
 
-            {preview?.valid && preview.roleTitle ? (
+            {preview?.roleTitle ? (
               <div className="candidate-invite-card rounded-2xl border border-[#1d3557]/10 bg-white/85 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.06)] backdrop-blur-md sm:p-6">
                 <div className="flex items-start gap-4">
                   {preview.logoUrl ? (
@@ -192,7 +194,17 @@ export default function CandidatePage() {
                           {preview.emailHint}
                         </span>
                       ) : null}
-                      {preview.expiresAt ? (
+                      {preview.scheduledAt ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-[color:var(--candidate-accent,#0e7490)]" />
+                          {new Date(preview.scheduledAt).toLocaleString("en-IN", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                            timeZone: "Asia/Kolkata",
+                          })}{" "}
+                          IST
+                        </span>
+                      ) : preview.expiresAt ? (
                         <span className="inline-flex items-center gap-1.5">
                           <Calendar className="h-3.5 w-3.5 text-[color:var(--candidate-accent,#0e7490)]" />
                           Until {new Date(preview.expiresAt).toLocaleDateString()}
@@ -212,7 +224,9 @@ export default function CandidatePage() {
               <p className="mt-4 max-w-lg text-base leading-relaxed text-[#475569] sm:text-lg">
                 {preview?.valid
                   ? "Confirm your details to enter the interview room. Use the same email address that received the invite."
-                  : "Enter the interview code from your invite email, then confirm your name and email to continue."}
+                  : preview?.scheduledAt
+                    ? "This interview link is locked until the scheduled time. Come back then to start."
+                    : "Enter the interview code from your invite email, then confirm your name and email to continue."}
               </p>
             </div>
 

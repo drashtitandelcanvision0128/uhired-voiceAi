@@ -1,9 +1,21 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { LucideIcon } from "lucide-react";
-import { CheckCircle2, X, XCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Eye,
+  KeyRound,
+  MoreVertical,
+  PauseCircle,
+  Pencil,
+  Trash2,
+  X,
+  XCircle,
+} from "lucide-react";
+import { AppSelect, type AppSelectOption } from "@/components/ui/app-select";
 
 export function MasterAlert({
   variant,
@@ -44,7 +56,7 @@ export function MasterKpiCard({
   value,
   hint,
   icon: Icon,
-  accent = "bg-surface/80 text-muted-foreground ring-border",
+  accent = "text-muted-foreground",
 }: {
   label: string;
   value: string | number;
@@ -53,17 +65,17 @@ export function MasterKpiCard({
   accent?: string;
 }) {
   return (
-    <article className="admin-card glow-card flex items-start justify-between gap-3 p-5">
-      <div className="min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-        <p className="mt-2 text-3xl font-black tracking-tight text-foreground">{value}</p>
-        {hint ? <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{hint}</p> : null}
+    <article className="admin-card flex h-full flex-col gap-3 p-4">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-muted-foreground text-sm">{label}</p>
+        {Icon ? (
+          <div className={`flex size-8 shrink-0 items-center justify-center rounded-md ${accent}`}>
+            <Icon className="size-4" aria-hidden />
+          </div>
+        ) : null}
       </div>
-      {Icon ? (
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ${accent}`}>
-          <Icon className="h-5 w-5" aria-hidden />
-        </div>
-      ) : null}
+      <p className="text-2xl font-semibold tracking-tight text-foreground">{value}</p>
+      {hint ? <p className="text-muted-foreground text-xs leading-snug">{hint}</p> : null}
     </article>
   );
 }
@@ -82,18 +94,18 @@ export function MasterHero({
   children?: React.ReactNode;
 }) {
   return (
-    <section className="admin-hero relative overflow-hidden rounded-2xl p-5 text-white md:p-6">
-      <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="admin-card p-4 sm:p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           {badge ? (
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan">{badge}</p>
+            <p className="text-muted-foreground text-xs font-medium">{badge}</p>
           ) : null}
-          <h2 className="mt-1 font-display text-xl font-extrabold tracking-tight md:text-2xl">{title}</h2>
-          {subtitle ? <p className="mt-2 text-sm text-white/80">{subtitle}</p> : null}
+          <h2 className="mt-1 text-lg font-semibold tracking-tight sm:text-xl">{title}</h2>
+          {subtitle ? <p className="text-muted-foreground mt-1.5 text-sm">{subtitle}</p> : null}
         </div>
         {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
       </div>
-      {children ? <div className="relative z-10 mt-5">{children}</div> : null}
+      {children ? <div className="mt-4">{children}</div> : null}
     </section>
   );
 }
@@ -113,7 +125,7 @@ export function MasterCard({
   elevated?: boolean;
   headerAction?: React.ReactNode;
 }) {
-  const cardClass = elevated ? "admin-card-elevated glow-card" : "admin-card glow-card";
+  const cardClass = elevated ? "admin-card-elevated" : "admin-card";
   return (
     <section className={`${cardClass} p-5 sm:p-6 ${className}`}>
       {title ? (
@@ -135,6 +147,9 @@ export const masterTableHeadClass =
 
 export const masterInputClass = "admin-input !py-2.5 !text-sm";
 
+export type MasterSelectOption = AppSelectOption;
+export const MasterSelect = AppSelect;
+
 export const masterBtnPrimary = "admin-btn-primary !text-sm";
 
 export const masterBtnGhost = "admin-btn-ghost !text-sm";
@@ -143,6 +158,94 @@ export const masterRowActionClass = "admin-btn-ghost !px-2.5 !py-1 !text-xs";
 
 export const masterRowActionDangerClass =
   "rounded-lg border border-destructive/25 bg-destructive/10 px-2.5 py-1 text-xs font-semibold text-destructive transition hover:bg-destructive/15";
+
+export type MasterRowMenuAction = {
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+  icon?: LucideIcon;
+};
+
+function defaultRowActionIcon(label: string): LucideIcon | undefined {
+  const key = label.trim().toLowerCase();
+  if (key === "view") return Eye;
+  if (key === "edit") return Pencil;
+  if (key === "delete") return Trash2;
+  if (key === "activate") return CheckCircle2;
+  if (key === "deactivate") return PauseCircle;
+  if (key === "regen passcode") return KeyRound;
+  return undefined;
+}
+
+export function MasterRowActionsMenu({
+  label,
+  actions,
+}: {
+  label: string;
+  actions: Array<MasterRowMenuAction | false | null | undefined>;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const items = actions.filter((item): item is MasterRowMenuAction => Boolean(item));
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(event: MouseEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open]);
+
+  if (items.length === 0) {
+    return <span className="text-muted-foreground text-xs">—</span>;
+  }
+
+  return (
+    <div className="relative flex justify-end" ref={menuRef}>
+      <button
+        type="button"
+        className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex size-7 items-center justify-center rounded-md"
+        aria-label={`Actions for ${label}`}
+        aria-expanded={open}
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen((current) => !current);
+        }}
+      >
+        <MoreVertical className="size-4" />
+      </button>
+      {open ? (
+        <div className="bg-popover text-popover-foreground absolute top-8 right-0 z-30 min-w-40 overflow-hidden rounded-md border py-1 shadow-md">
+          {items.map((item) => {
+            const Icon = item.icon ?? defaultRowActionIcon(item.label);
+            return (
+              <button
+                key={item.label}
+                type="button"
+                disabled={item.disabled}
+                className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm disabled:opacity-50 ${
+                  item.danger
+                    ? "text-destructive hover:bg-destructive/10"
+                    : "hover:bg-muted"
+                }`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setOpen(false);
+                  item.onClick();
+                }}
+              >
+                {Icon ? <Icon className="size-3.5" /> : null}
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export const MASTER_SESSION_STATUS_STYLES: Record<string, string> = {
   LIVE: "bg-destructive/12 text-destructive ring-destructive/25",
@@ -164,9 +267,9 @@ export function MasterStatusBadge({ status }: { status: string }) {
 
 export function MasterInlineKpi({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm">
-      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/70">{label}</p>
-      <p className="mt-1 text-xl font-black text-white">{value}</p>
+    <div className="rounded-lg border border-border bg-muted/60 px-3 py-2">
+      <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-[0.14em]">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
     </div>
   );
 }
@@ -235,6 +338,7 @@ export function MasterModal({
   loading = false,
   size = "lg",
   ariaLabelledBy = "master-modal-title",
+  presentation = "modal",
 }: {
   open: boolean;
   onClose: () => void;
@@ -246,13 +350,14 @@ export function MasterModal({
   loading?: boolean;
   size?: "md" | "lg" | "xl";
   ariaLabelledBy?: string;
+  presentation?: "modal" | "page";
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const maxWidth =
     size === "xl" ? "max-w-5xl" : size === "md" ? "max-w-2xl" : "max-w-4xl";
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || presentation === "page") return;
     closeRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !loading) onClose();
@@ -264,9 +369,45 @@ export function MasterModal({
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = prevOverflow;
     };
-  }, [open, onClose, loading]);
+  }, [open, onClose, loading, presentation]);
 
   if (!open) return null;
+
+  if (presentation === "page") {
+    return (
+      <section className="space-y-3">
+        <div className="admin-card px-4 py-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                className="text-muted-foreground hover:text-foreground mb-2 inline-flex items-center gap-1.5 text-xs font-medium disabled:opacity-50"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+                Back
+              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2
+                  id={ariaLabelledBy}
+                  className="text-lg font-semibold tracking-tight text-foreground"
+                >
+                  {title}
+                </h2>
+                {badges}
+              </div>
+              {subtitle ? (
+                <p className="text-muted-foreground mt-1 text-sm">{subtitle}</p>
+              ) : null}
+            </div>
+            {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
+          </div>
+        </div>
+        <div>{children}</div>
+      </section>
+    );
+  }
 
   return createPortal(
     <div

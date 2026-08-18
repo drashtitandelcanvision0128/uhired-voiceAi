@@ -7,7 +7,7 @@ import { MultiTenantSection, SecuritySection, CTASection } from "@/components/ma
 export const metadata: Metadata = {
   title: "Security & Privacy",
   description:
-    "Enterprise-grade security for AI voice interviews — encryption, tenant isolation, RBAC, audit logging, and controlled data retention.",
+    "Enterprise-grade security for AI voice interviews — encryption, company-level isolation, RBAC, audit logging, and controlled data retention.",
 };
 
 export default function SecurityPage() {

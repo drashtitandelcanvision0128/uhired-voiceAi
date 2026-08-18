@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 
   await touchMemberLogin(member.id);
 
-  const redirect = NextResponse.redirect(new URL("/admin", getPublicAppBaseUrl(request)));
+  const redirect = NextResponse.redirect(new URL("/admin/dashboard", getPublicAppBaseUrl(request)));
   try {
     await setCompanyAdminSessionCookie(redirect, {
       companyId: member.company.id,

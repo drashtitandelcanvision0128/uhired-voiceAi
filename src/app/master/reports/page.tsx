@@ -23,6 +23,7 @@ import {
   MasterHero,
   MasterInfoCard,
   MasterKpiCard,
+  MasterSelect,
   masterBtnGhost,
   masterBtnPrimary,
   masterInputClass,
@@ -111,17 +112,17 @@ const REPORT_SECTIONS = [
   {
     icon: Building2,
     title: "Company overview",
-    description: "Total companies, active tenants, sessions per company, and admin contact emails.",
+    description: "Total companies, active companies, interviews per company, and admin contact emails.",
   },
   {
     icon: GraduationCap,
     title: "Practice performance",
-    description: "Practice session volume, revenue, paying users, promo redemptions, and top domains.",
+    description: "Practice interview volume, revenue, paying users, promo redemptions, and top interview topics.",
   },
   {
     icon: ScrollText,
     title: "Session activity",
-    description: "Company vs practice split, completion rate, live sessions, and weekly trend chart.",
+    description: "Company vs practice split, completion rate, live interviews, and weekly trend chart.",
   },
   {
     icon: LifeBuoy,
@@ -264,7 +265,7 @@ function reportToCsv(report: PlatformReport) {
   push(["Promo redemptions", String(report.summary.promoRedemptions)]);
   push(["Support inquiries", String(report.summary.supportInquiries)]);
   push([]);
-  push(["Top domains", "Sessions"]);
+  push(["Top interview topics", "Interviews"]);
   for (const row of report.topDomains) push([row.domain, String(row.sessions)]);
   push([]);
   push(["Companies", "Domain", "Admin email", "Active", "Sessions"]);
@@ -429,17 +430,16 @@ export default function MasterReportsPage() {
                     className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                     aria-hidden="true"
                   />
-                  <select
+                  <MasterSelect
                     value={periodInput}
-                    onChange={(event) => setPeriodInput(event.target.value as ReportPeriod)}
-                    className={`${masterInputClass} w-full pl-10`}
-                  >
-                    {PERIOD_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={(value) => setPeriodInput(value as ReportPeriod)}
+                    className="w-full pl-10"
+                    aria-label="Report period"
+                    options={PERIOD_OPTIONS.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                  />
                 </div>
                 <span className="text-xs text-muted-foreground">
                   Currently showing: <span className="font-semibold text-foreground">{appliedPeriodLabel}</span>

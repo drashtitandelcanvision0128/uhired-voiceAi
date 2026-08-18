@@ -16,10 +16,6 @@ import {
 
   GraduationCap,
 
-  Link2,
-
-  Mail,
-
   Megaphone,
 
   Clock,
@@ -62,15 +58,15 @@ import {
 
   MasterKpiCard,
 
+  MasterSelect,
+
   masterBtnPrimary,
 
   masterBtnGhost,
 
   masterInputClass,
 
-  masterRowActionClass,
-
-  masterRowActionDangerClass,
+  MasterRowActionsMenu,
 
   masterTableHeadClass,
 
@@ -235,25 +231,22 @@ export default function MasterPromoCodesPage() {
   const [pageSize, setPageSize] = useState<MasterPageSize>(MASTER_PAGE_SIZE_OPTIONS[0]);
 
   const [tableSearch, setTableSearch] = useState("");
-
   const [appliedTableSearch, setAppliedTableSearch] = useState("");
-
-
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "active" | "inactive">("ALL");
 
   const filteredRows = useMemo(() => {
-
-    if (!appliedTableSearch.trim()) return rows;
-
     const q = appliedTableSearch.trim().toLowerCase();
-
-    return rows.filter(
-      (row) =>
+    return rows.filter((row) => {
+      if (statusFilter === "active" && !row.isActive) return false;
+      if (statusFilter === "inactive" && row.isActive) return false;
+      if (!q) return true;
+      return (
         row.code.toLowerCase().includes(q) ||
         (row.recipientEmail?.toLowerCase().includes(q) ?? false) ||
-        (row.companyName?.toLowerCase().includes(q) ?? false),
-    );
-
-  }, [rows, appliedTableSearch]);
+        (row.companyName?.toLowerCase().includes(q) ?? false)
+      );
+    });
+  }, [rows, appliedTableSearch, statusFilter]);
 
 
 
@@ -1154,49 +1147,43 @@ export default function MasterPromoCodesPage() {
 
                     <span className="admin-label">Company</span>
 
-                    <select
+                    <MasterSelect
 
                       value={companyName}
 
-                      onChange={(event) => setCompanyName(event.target.value)}
+                      onValueChange={setCompanyName}
 
                       required={assignToUser}
 
                       disabled={companiesLoading}
 
-                      className={`${masterInputClass} w-full`}
+                      className="w-full"
 
-                    >
+                      placeholder={companiesLoading ? "Loading companies..." : "Select company..."}
 
-                      <option value="">
+                      aria-label="Company"
 
-                        {companiesLoading ? "Loading companies..." : "Select company..."}
+                      options={[
 
-                      </option>
+                        { value: "", label: companiesLoading ? "Loading companies..." : "Select company..." },
 
-                      {companies.map((company) => (
+                        ...companies.map((company) => ({
 
-                        <option key={company.id} value={company.companyName}>
+                          value: company.companyName,
 
-                          {company.companyName} ({company.domain})
+                          label: `${company.companyName} (${company.domain})${!company.isActive ? " — inactive" : ""}`,
 
-                          {!company.isActive ? " — inactive" : ""}
+                        })),
 
-                        </option>
+                        ...(editingId && companyName && !companies.some((company) => company.companyName === companyName)
 
-                      ))}
+                          ? [{ value: companyName, label: `${companyName} (saved)` }]
 
-                      {editingId &&
+                          : []),
 
-                      companyName &&
+                      ]}
 
-                      !companies.some((company) => company.companyName === companyName) ? (
-
-                        <option value={companyName}>{companyName} (saved)</option>
-
-                      ) : null}
-
-                    </select>
+                    />
 
                     <span className="text-xs text-muted-foreground">
 
@@ -1355,7 +1342,7 @@ export default function MasterPromoCodesPage() {
 
           title="Existing promo codes"
 
-          subtitle="Track usage and share direct booking links. Deleting a code stops new redemptions only — past sessions stay in Practice Sessions."
+          subtitle="Track usage and share direct booking links. Deleting a code stops new redemptions only — past interviews stay in Practice Interviews."
 
         >
 
@@ -1398,17 +1385,27 @@ export default function MasterPromoCodesPage() {
                 </div>
 
               </label>
-
+              <label className="space-y-1.5">
+                <span className="admin-label">Status</span>
+                <MasterSelect
+                  value={statusFilter}
+                  onValueChange={(value) => {
+                    setStatusFilter(value as typeof statusFilter);
+                    setPage(1);
+                  }}
+                  aria-label="Filter promo codes by status"
+                  options={[
+                    { value: "ALL", label: "All status" },
+                    { value: "active", label: "Active" },
+                    { value: "inactive", label: "Inactive" },
+                  ]}
+                />
+              </label>
               <button
-
                 type="button"
-
                 onClick={() => {
-
                   setAppliedTableSearch(tableSearch.trim());
-
                   setPage(1);
-
                 }}
 
                 className={`${masterBtnPrimary} !px-5`}
@@ -1419,20 +1416,14 @@ export default function MasterPromoCodesPage() {
 
               </button>
 
-              {appliedTableSearch ? (
-
+              {appliedTableSearch || statusFilter !== "ALL" ? (
                 <button
-
                   type="button"
-
                   onClick={() => {
-
                     setTableSearch("");
-
                     setAppliedTableSearch("");
-
+                    setStatusFilter("ALL");
                     setPage(1);
-
                   }}
 
                   className={`${masterBtnGhost} inline-flex items-center gap-1.5 !px-4`}
@@ -1563,95 +1554,34 @@ export default function MasterPromoCodesPage() {
 
                     <td className="pr-4 text-muted-foreground">{new Date(row.createdAt).toLocaleString()}</td>
 
-                    <td>
-
-                      <div className="flex flex-wrap gap-2">
-
-                        <button
-
-                          type="button"
-
-                          onClick={() => editPromoCode(row)}
-
-                          className={masterRowActionClass}
-
-                        >
-
-                          Edit
-
-                        </button>
-
-                        <button
-
-                          type="button"
-
-                          onClick={() => void togglePromoActive(row)}
-
-                          className={row.isActive ? masterRowActionDangerClass : masterRowActionClass}
-
-                        >
-
-                          {row.isActive ? "Deactivate" : "Activate"}
-
-                        </button>
-
-                        <button
-
-                          type="button"
-
-                          onClick={() => void copyShareLink(row)}
-
-                          className={`${masterRowActionClass} inline-flex items-center gap-1`}
-
-                        >
-
-                          <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
-
-                          Copy link
-
-                        </button>
-
-                        {row.recipientEmail ? (
-
-                          <button
-
-                            type="button"
-
-                            onClick={() => void resendPromoEmail(row)}
-
-                            disabled={sendingEmailId === row.id}
-
-                            className={`${masterRowActionClass} inline-flex items-center gap-1 disabled:opacity-50`}
-
-                          >
-
-                            <Mail className="h-3.5 w-3.5" aria-hidden="true" />
-
-                            {sendingEmailId === row.id ? "Sending..." : "Send email"}
-
-                          </button>
-
-                        ) : null}
-
-                        <button
-
-                          type="button"
-
-                          onClick={() => void deletePromoCode(row.id)}
-
-                          disabled={deleteId === row.id}
-
-                          className={`${masterRowActionDangerClass} disabled:opacity-50`}
-
-                        >
-
-                          {deleteId === row.id ? "Deleting..." : "Delete"}
-
-                        </button>
-
-                      </div>
-
+                    <td className="text-right">
+                      <MasterRowActionsMenu
+                        label={row.code}
+                        actions={[
+                          { label: "Edit", onClick: () => editPromoCode(row) },
+                          {
+                            label: row.isActive ? "Deactivate" : "Activate",
+                            onClick: () => void togglePromoActive(row),
+                            danger: row.isActive,
+                          },
+                          { label: "Copy link", onClick: () => void copyShareLink(row) },
+                          row.recipientEmail
+                            ? {
+                                label: sendingEmailId === row.id ? "Sending..." : "Send email",
+                                onClick: () => void resendPromoEmail(row),
+                                disabled: sendingEmailId === row.id,
+                              }
+                            : null,
+                          {
+                            label: deleteId === row.id ? "Deleting..." : "Delete",
+                            onClick: () => void deletePromoCode(row.id),
+                            danger: true,
+                            disabled: deleteId === row.id,
+                          },
+                        ]}
+                      />
                     </td>
+
 
                   </tr>
 

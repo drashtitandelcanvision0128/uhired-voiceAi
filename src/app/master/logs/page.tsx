@@ -32,6 +32,7 @@ import {
   MasterCard,
   MasterHero,
   MasterKpiCard,
+  MasterSelect,
   masterBtnGhost,
   masterBtnPrimary,
   masterInputClass,
@@ -287,33 +288,36 @@ export default function MasterLogsPage() {
 
               <label className="block space-y-1.5">
                 <span className="admin-label">Category</span>
-                <select
+                <MasterSelect
                   value={categoryInput}
-                  onChange={(event) => setCategoryInput(event.target.value as "" | LogCategory)}
-                  className={`${masterInputClass} w-full`}
-                >
-                  <option value="">All categories</option>
-                  {LOG_CATEGORY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(value) => setCategoryInput(value as "" | LogCategory)}
+                  className="w-full"
+                  aria-label="Filter by category"
+                  options={[
+                    { value: "", label: "All categories" },
+                    ...LOG_CATEGORY_OPTIONS.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    })),
+                  ]}
+                />
               </label>
 
               <label className="block space-y-1.5">
                 <span className="admin-label">Level</span>
-                <select
+                <MasterSelect
                   value={levelInput}
-                  onChange={(event) => setLevelInput(event.target.value as "" | LogLevel)}
-                  className={`${masterInputClass} w-full`}
-                >
-                  <option value="">All levels</option>
-                  <option value="INFO">Info</option>
-                  <option value="SUCCESS">Success</option>
-                  <option value="WARNING">Warning</option>
-                  <option value="ERROR">Error</option>
-                </select>
+                  onValueChange={(value) => setLevelInput(value as "" | LogLevel)}
+                  className="w-full"
+                  aria-label="Filter by level"
+                  options={[
+                    { value: "", label: "All levels" },
+                    { value: "INFO", label: "Info" },
+                    { value: "SUCCESS", label: "Success" },
+                    { value: "WARNING", label: "Warning" },
+                    { value: "ERROR", label: "Error" },
+                  ]}
+                />
               </label>
 
               <div className="flex flex-wrap gap-2">

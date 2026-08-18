@@ -65,7 +65,7 @@ export function MasterGlobalSearch() {
   return (
     <div ref={containerRef} className="relative w-full">
       <Search
-        className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+        className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
         aria-hidden="true"
       />
       <input
@@ -74,8 +74,8 @@ export function MasterGlobalSearch() {
         onFocus={() => {
           if (results.length) setOpen(true);
         }}
-        placeholder="Search companies, sessions, promo codes…"
-        className="admin-header-search w-full"
+        placeholder="Search companies, interviews, promo codes…"
+        className="border-input bg-background placeholder:text-muted-foreground w-full rounded-lg border py-2 pl-10 pr-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
         aria-label="Global platform search"
         autoComplete="off"
       />
