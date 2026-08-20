@@ -6,6 +6,7 @@ export async function readCompanyLogoBytes(): Promise<Uint8Array | null> {
   const candidates = [
     process.env.COMPANY_LOGO_PATH?.trim(),
     path.join(process.cwd(), "public", "company-logo.png"),
+    path.join(process.cwd(), "public", "brand", "logo-black.png"),
     path.join(process.cwd(), "public", "company-logo.jpg"),
   ].filter((p): p is string => Boolean(p));
 

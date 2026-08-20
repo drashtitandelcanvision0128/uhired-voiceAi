@@ -16,7 +16,7 @@ type Context = {
   params: Promise<{ sessionId: string }>;
 };
 
-/** Background question grading (via `after`) may run for several minutes. */
+/** AI question grading may run for several minutes before the response returns. */
 export const maxDuration = 300;
 
 const transcriptItemSchema = z.object({
@@ -188,7 +188,7 @@ export async function POST(request: Request, context: Context) {
       ? new Date(startedAt.getTime() + Math.round(body.durationSec) * 1000)
       : new Date();
 
-  await withPrismaRetry(() =>
+  const scoringJob = await withPrismaRetry(() =>
     prisma.$transaction(async (tx) => {
       await tx.interviewSession.update({
         where: { id: sessionId },
@@ -222,7 +222,7 @@ export async function POST(request: Request, context: Context) {
         },
       });
 
-      await tx.scoringBatchJob.create({
+      return tx.scoringBatchJob.create({
         data: {
           sessionId,
           status: "PENDING",
@@ -235,13 +235,92 @@ export async function POST(request: Request, context: Context) {
     }),
   );
 
-  after(async () => {
-    try {
-      await gradeCompletedSessionQuestions(sessionId);
-    } catch (gradingError) {
-      console.error("[interview-complete] background question grading failed:", gradingError);
+  let finalScore = score;
+  let gradingPending = false;
+  let gradingErrorMessage: string | null = null;
+  let accuracyPercent: number | null = null;
+  let questionResults: unknown = null;
+
+  try {
+    await gradeCompletedSessionQuestions(sessionId);
+    const refreshed = await prisma.scorecard.findUnique({
+      where: { sessionId },
+      select: {
+        overallScore: true,
+        communication: true,
+        domainDepth: true,
+        confidence: true,
+        summary: true,
+        strengths: true,
+        improvements: true,
+        evidence: true,
+        scoringMode: true,
+        scoringModel: true,
+        accuracyPercent: true,
+        questionResults: true,
+      },
+    });
+    if (refreshed) {
+      finalScore = {
+        overallScore: refreshed.overallScore,
+        communication: refreshed.communication,
+        domainDepth: refreshed.domainDepth,
+        confidence: refreshed.confidence,
+        summary: refreshed.summary,
+        strengths: (refreshed.strengths as string[]) ?? [],
+        improvements: (refreshed.improvements as string[]) ?? [],
+        evidence: (refreshed.evidence as string[]) ?? [],
+        scoringMode: refreshed.scoringMode ?? "ai-rubric-question-hybrid",
+        scoringModel: refreshed.scoringModel,
+      };
+      accuracyPercent = refreshed.accuracyPercent;
+      questionResults = refreshed.questionResults;
     }
-  });
+    await prisma.scoringBatchJob.update({
+      where: { id: scoringJob.id },
+      data: {
+        status: "COMPLETED",
+        completedAt: new Date(),
+        resultPayload: {
+          overallScore: finalScore.overallScore,
+          scoringMode: finalScore.scoringMode,
+          accuracyPercent,
+        },
+      },
+    });
+  } catch (gradingError) {
+    gradingPending = true;
+    gradingErrorMessage =
+      gradingError instanceof Error ? gradingError.message : "AI grading failed.";
+    console.error("[interview-complete] synchronous question grading failed:", gradingError);
+    await prisma.scoringBatchJob
+      .update({
+        where: { id: scoringJob.id },
+        data: {
+          status: "FAILED",
+          error: gradingErrorMessage,
+          completedAt: new Date(),
+        },
+      })
+      .catch(() => null);
+
+    // Keep a background retry so recruiters still get AI analysis if the sync path timed out.
+    after(async () => {
+      try {
+        await gradeCompletedSessionQuestions(sessionId);
+        await prisma.scoringBatchJob.updateMany({
+          where: { id: scoringJob.id },
+          data: {
+            status: "COMPLETED",
+            completedAt: new Date(),
+            error: null,
+          },
+        });
+      } catch (retryError) {
+        console.error("[interview-complete] background grading retry failed:", retryError);
+      }
+    });
+  }
 
   if (session.company?.atsWebhookUrl) {
     after(async () => {
@@ -258,12 +337,19 @@ export async function POST(request: Request, context: Context) {
           requirementId: session.requirementId,
           positionTitle: session.positionTitle,
           status: "COMPLETED",
-          overallScore: score.overallScore,
+          overallScore: finalScore.overallScore,
           completedAt: endedAt.toISOString(),
         },
       });
     });
   }
 
-  return NextResponse.json({ ok: true, score, gradingPending: true });
+  return NextResponse.json({
+    ok: true,
+    score: finalScore,
+    gradingPending,
+    accuracyPercent,
+    questionResults,
+    ...(gradingErrorMessage ? { gradingError: gradingErrorMessage } : {}),
+  });
 }

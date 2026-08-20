@@ -66,7 +66,7 @@ export async function GET(request: Request) {
         title: company.name,
         subtitle: `${company.domain} · ${company.adminEmail}`,
         meta: company.isActive ? "Active" : "Inactive",
-        href: `/master/companies?search=${encodeURIComponent(company.name)}`,
+        href: `/master/companies/${company.id}`,
       })),
       ...sessions.map((session) => ({
         id: `session-${session.id}`,
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
         meta: `${session.sessionType} · ${session.status}`,
         href:
           session.sessionType === "PRACTICE"
-            ? `/master/practice-sessions?sessionId=${session.id}`
+            ? `/master/practice-sessions/${session.id}`
             : `/master/company-sessions?sessionId=${session.id}`,
       })),
       ...supportRows.map((inquiry) => ({

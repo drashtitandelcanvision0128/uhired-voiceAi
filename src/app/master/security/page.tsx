@@ -11,11 +11,9 @@ import {
 } from "@/components/master-pagination";
 import {
   MasterAlert,
-  MasterCard,
-  MasterHero,
-  MasterInlineKpi,
   MasterSelect,
   masterBtnGhost,
+  masterBtnPrimary,
   masterInputClass,
   masterTableHeadClass,
 } from "@/components/master-ui";
@@ -40,6 +38,21 @@ type SecurityResponse = {
   events: SecurityEvent[];
   pagination: { page: number; pageSize: number; total: number; totalPages: number };
 };
+
+function formatWhen(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatIp(ip: string | null) {
+  if (!ip) return "—";
+  if (ip === "::1" || ip === "127.0.0.1") return "Local";
+  return ip;
+}
 
 export default function MasterSecurityPage() {
   const router = useRouter();
@@ -68,7 +81,7 @@ export default function MasterSecurityPage() {
         return;
       }
       if (!res.ok) {
-        setError(payload.error ?? "Unable to load security log.");
+        setError(payload.error ?? "Could not load logins.");
         return;
       }
       setData(payload);
@@ -86,43 +99,32 @@ export default function MasterSecurityPage() {
   }, [filter, trustFilter, appliedSearch, pageSize]);
 
   return (
-    <MasterShell
-      title="Security & Login Audit"
-      subtitle="Master portal sign-in history — successful logins, failures, IPs, and trusted devices."
-      topActions={
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className={`${masterBtnGhost} inline-flex items-center gap-2 !px-4 !py-2.5 disabled:opacity-60`}
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
-      }
-    >
-      <div className="space-y-5">
+    <MasterShell title="Security" subtitle="Who tried to sign in as admin.">
+      <div className="space-y-3">
         {error ? <MasterAlert variant="error">{error}</MasterAlert> : null}
 
-        <MasterHero
-          badge="Login audit"
-          title="Login audit trail"
-          subtitle="Every master login attempt is recorded with timestamp, IP address, and whether the device was trusted. Review failed attempts to spot brute-force or unauthorized access."
-        >
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <MasterInlineKpi label="Total events" value={data?.summary.totalEvents ?? 0} />
-            <MasterInlineKpi label="Successful logins" value={data?.summary.successfulLogins ?? 0} />
-            <MasterInlineKpi label="Failed attempts" value={data?.summary.failedLogins ?? 0} />
-            <MasterInlineKpi label="Failed (24h)" value={data?.summary.recentFailed24h ?? 0} />
-          </div>
-        </MasterHero>
+        <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <article className="admin-card p-3">
+            <p className="text-xs text-muted-foreground">Logins</p>
+            <p className="mt-1 text-xl font-semibold text-foreground">{data?.summary.totalEvents ?? 0}</p>
+          </article>
+          <article className="admin-card p-3">
+            <p className="text-xs text-muted-foreground">Success</p>
+            <p className="mt-1 text-xl font-semibold text-foreground">{data?.summary.successfulLogins ?? 0}</p>
+          </article>
+          <article className="admin-card p-3">
+            <p className="text-xs text-muted-foreground">Failed</p>
+            <p className="mt-1 text-xl font-semibold text-foreground">{data?.summary.failedLogins ?? 0}</p>
+          </article>
+          <article className="admin-card p-3">
+            <p className="text-xs text-muted-foreground">Failed (24h)</p>
+            <p className="mt-1 text-xl font-semibold text-foreground">{data?.summary.recentFailed24h ?? 0}</p>
+          </article>
+        </section>
 
-        <MasterCard
-          elevated
-          title="Login events"
-        >
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[14rem] flex-1">
+        <section className="admin-card overflow-hidden">
+          <div className="flex flex-wrap items-center gap-2 p-3">
+            <div className="relative min-w-[12rem] flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={searchInput}
@@ -130,7 +132,7 @@ export default function MasterSecurityPage() {
                 onKeyDown={(event) => {
                   if (event.key === "Enter") setAppliedSearch(searchInput.trim());
                 }}
-                placeholder="Search email or IP..."
+                placeholder="Email or IP"
                 className={`${masterInputClass} w-full pl-10`}
                 aria-label="Search login events"
               />
@@ -138,18 +140,18 @@ export default function MasterSecurityPage() {
             <MasterSelect
               value={filter}
               onValueChange={(value) => setFilter(value as typeof filter)}
-              className="min-w-[11rem]"
+              className="min-w-[9rem]"
               aria-label="Filter by result"
               options={[
-                { value: "", label: "All events" },
-                { value: "success", label: "Successful only" },
-                { value: "failed", label: "Failed only" },
+                { value: "", label: "All" },
+                { value: "success", label: "Success" },
+                { value: "failed", label: "Failed" },
               ]}
             />
             <MasterSelect
               value={trustFilter}
               onValueChange={(value) => setTrustFilter(value as typeof trustFilter)}
-              className="min-w-[11rem]"
+              className="min-w-[9rem]"
               aria-label="Filter by trusted device"
               options={[
                 { value: "", label: "All devices" },
@@ -160,60 +162,75 @@ export default function MasterSecurityPage() {
             <button
               type="button"
               onClick={() => setAppliedSearch(searchInput.trim())}
-              className={`${masterBtnGhost} !px-4`}
+              className={`${masterBtnPrimary} !px-4`}
             >
               Search
             </button>
+            <button
+              type="button"
+              onClick={() => void load()}
+              disabled={loading}
+              className={`${masterBtnGhost} inline-flex h-10 items-center justify-center !px-3 disabled:opacity-60`}
+              aria-label="Refresh"
+              title="Refresh"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+
+          <div className="overflow-x-auto px-3 pb-3">
+            <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
                 <tr className={masterTableHeadClass}>
-                  <th className="py-3 pr-4">Email</th>
+                  <th className="py-2 pr-4">Email</th>
                   <th className="pr-4">Result</th>
                   <th className="pr-4">IP</th>
-                  <th className="pr-4">Trusted device</th>
-                  <th>When</th>
+                  <th className="pr-4">Trusted</th>
+                  <th>Time</th>
                 </tr>
               </thead>
               <tbody>
                 {(data?.events ?? []).map((event) => (
-                  <tr key={event.id} className="border-b border-slate-100">
-                    <td className="py-4 pr-4 font-semibold text-[#0f172a]">{event.email}</td>
+                  <tr key={event.id} className="border-b border-border">
+                    <td className="py-2.5 pr-4 font-semibold text-foreground">{event.email}</td>
                     <td className="pr-4">
                       <span
                         className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
                           event.success
-                            ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70"
-                            : "bg-red-50 text-red-700 ring-1 ring-red-200/70"
+                            ? "bg-success/12 text-success ring-1 ring-success/25"
+                            : "bg-destructive/12 text-destructive ring-1 ring-destructive/25"
                         }`}
                       >
                         {event.success ? "Success" : "Failed"}
                       </span>
                     </td>
-                    <td className="pr-4 font-mono text-xs text-slate-500">{event.clientIp ?? "—"}</td>
-                    <td className="pr-4 text-slate-600">{event.trustDevice ? "Yes" : "No"}</td>
-                    <td className="text-xs text-slate-500">{new Date(event.createdAt).toLocaleString()}</td>
+                    <td className="pr-4 font-mono text-xs text-muted-foreground">{formatIp(event.clientIp)}</td>
+                    <td className="pr-4 text-muted-foreground">{event.trustDevice ? "Yes" : "No"}</td>
+                    <td className="text-xs text-muted-foreground">{formatWhen(event.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            {!loading && !(data?.events.length ?? 0) ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No login events.</p>
+            ) : null}
+            {loading && !(data?.events.length ?? 0) ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
+            ) : null}
           </div>
 
           <MasterPagination
             page={page}
             pageSize={pageSize}
             totalItems={data?.pagination.total ?? 0}
-            itemLabel="events"
+            itemLabel="logins"
             onPageChange={setPage}
             onPageSizeChange={(size) => {
               setPageSize(size);
               setPage(1);
             }}
           />
-
-          {loading ? <p className="mt-4 text-sm text-slate-500">Loading security log...</p> : null}
-        </MasterCard>
+        </section>
       </div>
     </MasterShell>
   );

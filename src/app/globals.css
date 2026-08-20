@@ -519,7 +519,7 @@ html:not(.dark) .bg-mesh {
   }
 
   html:not(.dark) .admin-header {
-    background: color-mix(in oklab, var(--background) 86%, transparent);
+    background: var(--background);
     border-color: var(--border);
     box-shadow: none;
   }
@@ -624,6 +624,16 @@ html:not(.dark) .bg-mesh {
       color-mix(in oklab, var(--success) 8%, #ffffff) 0%,
       color-mix(in oklab, var(--cyan) 6%, #ffffff) 100%
     );
+  }
+
+  html.dark .admin-alert-banner {
+    border-color: rgba(52, 211, 153, 0.45);
+    background: linear-gradient(
+      90deg,
+      color-mix(in oklab, #10b981 28%, #0b1a16) 0%,
+      color-mix(in oklab, #14b8a6 20%, #111827) 100%
+    );
+    color: #ecfdf5;
   }
 
   html:not(.dark) .glow-card:hover {
@@ -768,10 +778,10 @@ html:not(.dark) .bg-mesh {
   }
 
   html.dark .admin-header {
-    background: color-mix(in oklab, var(--background) 86%, transparent);
+    background: var(--background);
     border-color: var(--border);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   html.dark .admin-card,
@@ -1148,11 +1158,11 @@ html:not(.dark) .bg-mesh {
   }
 
   .admin-header {
-    background: color-mix(in oklab, var(--background) 86%, transparent);
+    background: var(--background);
     border-color: var(--border);
     box-shadow: none;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .admin-header-search {
@@ -2434,41 +2444,9 @@ html:not(.dark) .bg-mesh {
   }
 }
 
-/* Candidate invite / entry experience */
+/* Candidate invite / entry — uses shared site theme tokens (light + dark) */
 .candidate-entry {
-  --candidate-accent: #0e7490;
-  background: linear-gradient(165deg, #f4f7fb 0%, #eef6f8 42%, #f7fafc 100%);
-}
-
-.candidate-entry-mesh {
-  background:
-    radial-gradient(ellipse 70% 50% at 12% 18%, color-mix(in oklab, var(--candidate-accent) 14%, transparent), transparent 60%),
-    radial-gradient(ellipse 55% 45% at 88% 12%, color-mix(in oklab, #1d3557 10%, transparent), transparent 58%),
-    radial-gradient(ellipse 50% 40% at 70% 88%, color-mix(in oklab, var(--candidate-accent) 8%, transparent), transparent 55%);
-}
-
-.candidate-entry-grid {
-  background-image:
-    linear-gradient(color-mix(in oklab, #1d3557 6%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in oklab, #1d3557 6%, transparent) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 20%, transparent 75%);
-}
-
-.candidate-invite-card {
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
-}
-
-.candidate-invite-card:hover {
-  border-color: color-mix(in oklab, var(--candidate-accent) 28%, transparent);
-  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.08);
-}
-
-.candidate-entry-form {
-  transition: box-shadow 0.25s ease, transform 0.25s ease;
+  --candidate-accent: var(--primary);
 }
 
 @keyframes confirmIn {

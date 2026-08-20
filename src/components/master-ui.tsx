@@ -186,64 +186,103 @@ export function MasterRowActionsMenu({
   actions: Array<MasterRowMenuAction | false | null | undefined>;
 }) {
   const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const items = actions.filter((item): item is MasterRowMenuAction => Boolean(item));
 
+  function placeMenu() {
+    const button = buttonRef.current;
+    if (!button) return;
+    const rect = button.getBoundingClientRect();
+    const width = 176;
+    const height = items.length * 36 + 8;
+    const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
+    const openUp = rect.bottom + height > window.innerHeight - 8;
+    const top = openUp ? Math.max(8, rect.top - height - 4) : rect.bottom + 4;
+    setCoords({ top, left });
+  }
+
   useEffect(() => {
     if (!open) return;
+    placeMenu();
     function onDocClick(event: MouseEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function onDismiss() {
+      setOpen(false);
     }
     document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, [open]);
+    document.addEventListener("scroll", onDismiss, true);
+    window.addEventListener("resize", onDismiss);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("scroll", onDismiss, true);
+      window.removeEventListener("resize", onDismiss);
+    };
+  }, [open, items.length]);
 
   if (items.length === 0) {
     return <span className="text-muted-foreground text-xs">—</span>;
   }
 
   return (
-    <div className="relative flex justify-end" ref={menuRef}>
+    <>
       <button
+        ref={buttonRef}
         type="button"
         className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex size-7 items-center justify-center rounded-md"
         aria-label={`Actions for ${label}`}
         aria-expanded={open}
         onClick={(event) => {
           event.stopPropagation();
-          setOpen((current) => !current);
+          if (open) {
+            setOpen(false);
+            return;
+          }
+          placeMenu();
+          setOpen(true);
         }}
       >
         <MoreVertical className="size-4" />
       </button>
-      {open ? (
-        <div className="bg-popover text-popover-foreground absolute top-8 right-0 z-30 min-w-40 overflow-hidden rounded-md border py-1 shadow-md">
-          {items.map((item) => {
-            const Icon = item.icon ?? defaultRowActionIcon(item.label);
-            return (
-              <button
-                key={item.label}
-                type="button"
-                disabled={item.disabled}
-                className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm disabled:opacity-50 ${
-                  item.danger
-                    ? "text-destructive hover:bg-destructive/10"
-                    : "hover:bg-muted"
-                }`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setOpen(false);
-                  item.onClick();
-                }}
-              >
-                {Icon ? <Icon className="size-3.5" /> : null}
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
+      {open
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="bg-popover text-popover-foreground fixed z-[80] min-w-44 overflow-hidden rounded-md border py-1 shadow-lg"
+              style={{ top: coords.top, left: coords.left }}
+            >
+              {items.map((item) => {
+                const Icon = item.icon ?? defaultRowActionIcon(item.label);
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    disabled={item.disabled}
+                    className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm disabled:opacity-50 ${
+                      item.danger
+                        ? "text-destructive hover:bg-destructive/10"
+                        : "hover:bg-muted"
+                    }`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setOpen(false);
+                      item.onClick();
+                    }}
+                  >
+                    {Icon ? <Icon className="size-3.5" /> : null}
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }
 
@@ -253,14 +292,22 @@ export const MASTER_SESSION_STATUS_STYLES: Record<string, string> = {
   COMPLETED: "bg-success/12 text-success ring-success/25",
 };
 
+export function formatMasterStatus(status: string) {
+  if (status === "LIVE") return "Live";
+  if (status === "READY") return "Ready";
+  if (status === "COMPLETED") return "Completed";
+  if (!status) return "—";
+  return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+}
+
 export function MasterStatusBadge({ status }: { status: string }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ring-1 ${
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ring-1 ${
         MASTER_SESSION_STATUS_STYLES[status] ?? "bg-surface/80 text-muted-foreground ring-border"
       }`}
     >
-      {status}
+      {formatMasterStatus(status)}
     </span>
   );
 }
@@ -426,12 +473,12 @@ export function MasterModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={ariaLabelledBy}
-        className={`admin-card-elevated glow-card relative flex ${maxWidth} w-full max-h-[92vh] flex-col overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.45)] animate-[confirmIn_0.22s_ease-out]`}
+        className={`master-shell admin-card-elevated relative flex ${maxWidth} w-full max-h-[92vh] flex-col overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.45)] animate-[confirmIn_0.22s_ease-out]`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="relative shrink-0 border-b border-border bg-gradient-to-br from-primary/8 via-surface/40 to-violet/8 px-5 py-4 sm:px-6">
+        <div className="relative shrink-0 border-b border-border bg-gradient-to-br from-primary/10 via-card to-primary/5 px-5 py-4 sm:px-6">
           <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/10 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-6 left-1/3 h-24 w-24 rounded-full bg-violet/10 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-6 left-1/3 h-24 w-24 rounded-full bg-primary/8 blur-2xl" />
           <div className="relative flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">

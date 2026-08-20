@@ -38,9 +38,50 @@ export async function GET(request: Request, context: Context) {
     return NextResponse.json({ error: "Company not found." }, { status: 404 });
   }
 
-  const liveSessions = await prisma.interviewSession.count({
-    where: { companyId, status: "LIVE" },
-  });
+  const [liveSessions, recentSessions, requirements, members] = await Promise.all([
+    prisma.interviewSession.count({
+      where: { companyId, status: "LIVE" },
+    }),
+    prisma.interviewSession.findMany({
+      where: { companyId },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      select: {
+        id: true,
+        candidateName: true,
+        candidateEmail: true,
+        positionTitle: true,
+        domain: true,
+        status: true,
+        createdAt: true,
+      },
+    }),
+    prisma.requirement.findMany({
+      where: { companyId, isArchived: false },
+      orderBy: { updatedAt: "desc" },
+      take: 8,
+      select: {
+        id: true,
+        title: true,
+        domain: true,
+        durationMin: true,
+        createdAt: true,
+      },
+    }),
+    prisma.companyMember.findMany({
+      where: { companyId },
+      orderBy: { createdAt: "asc" },
+      take: 20,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+      },
+    }),
+  ]);
 
   return NextResponse.json({
     id: company.id,
@@ -56,6 +97,29 @@ export async function GET(request: Request, context: Context) {
     liveSessions,
     candidateCount: company._count.candidates,
     requirementCount: company._count.requirements,
+    recentSessions: recentSessions.map((session) => ({
+      id: session.id,
+      candidateName: session.candidateName ?? "—",
+      candidateEmail: session.candidateEmail ?? "",
+      role: session.positionTitle || session.domain,
+      status: session.status,
+      createdAt: session.createdAt.toISOString(),
+    })),
+    jobs: requirements.map((job) => ({
+      id: job.id,
+      title: job.title || job.domain,
+      domain: job.domain,
+      durationMin: job.durationMin,
+      createdAt: job.createdAt.toISOString(),
+    })),
+    members: members.map((member) => ({
+      id: member.id,
+      email: member.email,
+      name: member.name ?? "",
+      role: member.role,
+      isActive: member.isActive,
+      lastLoginAt: member.lastLoginAt?.toISOString() ?? null,
+    })),
   });
 }
 

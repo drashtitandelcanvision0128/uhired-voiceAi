@@ -68,6 +68,7 @@
     "docx": "^9.7.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
+    "playwright": "^1.62.1",
     "prisma": "^6.18.0",
     "tailwindcss": "^4",
     "typescript": "^5"

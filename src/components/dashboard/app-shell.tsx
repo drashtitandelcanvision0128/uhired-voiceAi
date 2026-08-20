@@ -6,6 +6,7 @@ import { Mail, PanelLeft, Plus, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { AdminPortalLogo } from "@/components/admin-portal-logo";
+import { BrandLogoMark } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -208,9 +209,17 @@ export function AppShell({
           desktopCollapsed ? "justify-center lg:flex-col" : "justify-between",
         )}
       >
-        <div className={cn("min-w-0 flex-1", desktopCollapsed && "hidden lg:flex-none")}>
+        <div className={cn("min-w-0 flex-1", desktopCollapsed && "lg:flex-none")}>
           {desktopCollapsed ? (
-            <span className="sr-only">{brandTitle}</span>
+            <>
+              <div className="lg:hidden">
+                <AdminPortalLogo subtitle={brandSubtitle} title={brandTitle} />
+              </div>
+              <div className="hidden lg:block">
+                <span className="sr-only">{brandTitle}</span>
+                <BrandLogoMark variant="theme" size={32} />
+              </div>
+            </>
           ) : (
             <AdminPortalLogo subtitle={brandSubtitle} title={brandTitle} />
           )}
@@ -290,7 +299,7 @@ export function AppShell({
       </aside>
 
       <div className={cn("flex min-w-0 flex-1 flex-col transition-[padding] duration-200", desktopCollapsed ? "lg:pl-16" : "lg:pl-64")}>
-        <header className="admin-header sticky top-0 z-30 flex h-12 items-center gap-2 border-b px-3 sm:px-4">
+        <header className="admin-header sticky top-0 z-40 flex h-12 items-center gap-2 border-b px-3 sm:px-4">
           <button
             type="button"
             className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex size-8 shrink-0 items-center justify-center rounded-lg lg:hidden"

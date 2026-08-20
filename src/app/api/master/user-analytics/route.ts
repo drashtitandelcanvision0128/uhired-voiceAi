@@ -4,6 +4,8 @@ import { hasMasterSessionFromRequest } from "@/lib/master-auth";
 
 type UserType = "PRACTICE" | "COMPANY_CANDIDATE" | "INVITED" | "COMPANY_ADMIN";
 
+const USER_TYPE_ORDER: UserType[] = ["PRACTICE", "COMPANY_CANDIDATE", "INVITED", "COMPANY_ADMIN"];
+
 type UserAccumulator = {
   email: string;
   name: string;
@@ -263,7 +265,7 @@ export async function GET(request: Request) {
         return {
           email: user.email,
           name: user.name,
-          types: Array.from(user.types),
+          types: USER_TYPE_ORDER.filter((type) => user.types.has(type)),
           sessionCount: user.sessionCount,
           completedCount: user.completedCount,
           practiceCount: user.practiceCount,

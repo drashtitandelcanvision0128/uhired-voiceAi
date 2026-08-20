@@ -279,8 +279,8 @@ export default function MasterCompaniesPage() {
 
   return (
     <MasterShell
-      title="Company Directory"
-      subtitle="Browse existing clients first. Open a company to edit it, or add a new account."
+      title="Companies"
+      subtitle="Open a company to edit it, or add a new one."
       topActions={
         <button
           type="button"
@@ -300,28 +300,28 @@ export default function MasterCompaniesPage() {
           <MasterKpiCard
             label="Companies"
             value={data ? data.metrics.totalCompanies : "—"}
-            hint="Client accounts on this list"
+            hint="On this list"
             icon={Building2}
             accent="bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-400/25"
           />
           <MasterKpiCard
-            label="Active Enterprise"
+            label="Active"
             value={data ? data.metrics.activeEnterprise : "—"}
-            hint="Live companies on the Enterprise plan"
+            hint="Turned on"
             icon={Shield}
             accent="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/25"
           />
           <MasterKpiCard
-            label="AI sessions"
+            label="Interviews"
             value={data ? data.metrics.totalAiSessions : "—"}
-            hint="Interviews run across these companies"
+            hint="Company interviews so far"
             icon={Activity}
             accent="bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/25"
           />
           <MasterKpiCard
             label="Inactive companies"
             value={data ? data.metrics.inactiveCompanies : "—"}
-            hint="Accounts turned off on this list"
+            hint="Turned off"
             icon={PauseCircle}
             accent="bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/25"
           />
@@ -332,8 +332,8 @@ export default function MasterCompaniesPage() {
           title="Companies"
           subtitle={
             loading
-              ? "Loading client accounts…"
-              : `${totalCompanies.toLocaleString()} ${totalCompanies === 1 ? "client" : "clients"}. Search to find one, or add a new account.`
+              ? "Loading…"
+              : `${totalCompanies.toLocaleString()} ${totalCompanies === 1 ? "company" : "companies"}`
           }
           headerAction={<AddCompanyLink />}
         >

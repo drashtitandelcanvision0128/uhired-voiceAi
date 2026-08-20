@@ -103,8 +103,8 @@ export default function MasterProfilePage() {
 
   return (
     <MasterShell
-      title="Master Profile"
-      subtitle="View your admin email and update your login credentials."
+      title="Profile"
+      subtitle="Change your email or password."
       topActions={
         <button
           type="button"
@@ -123,8 +123,8 @@ export default function MasterProfilePage() {
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] xl:items-start">
           <MasterCard
-            title="Update profile"
-            subtitle="Change your login email or password. Current password is required for any update."
+            title="Your login"
+            subtitle="Current password is required to save changes."
             className="!p-6 sm:!p-8"
           >
             <div className="mb-6 flex items-start gap-4">

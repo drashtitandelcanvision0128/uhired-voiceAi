@@ -183,8 +183,8 @@ export default function MasterCareersContentPage() {
 
   return (
     <MasterShell
-      title="Careers CMS"
-      subtitle="Manage job openings shown on the public /careers page."
+      title="Careers"
+      subtitle="Job openings on the public careers page."
     >
       {error ? <MasterAlert variant="error" className="mb-4">{error}</MasterAlert> : null}
       {success ? <MasterAlert variant="success" className="mb-4">{success}</MasterAlert> : null}

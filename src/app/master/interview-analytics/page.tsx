@@ -3,20 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  BarChart3,
   Briefcase,
-  Building2,
   CheckCircle2,
   ClipboardList,
   Mail,
   RefreshCw,
-  TrendingUp,
 } from "lucide-react";
 import { MasterShell } from "@/components/master-shell";
 import {
   MasterAlert,
   MasterCard,
-  MasterHero,
   MasterKpiCard,
   MasterSelect,
   masterBtnGhost,
@@ -86,33 +82,35 @@ function TrendBars({
 }) {
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
-    <MasterCard className="p-5">
-      <h3 className="admin-section-title text-sm">{title}</h3>
-      <div className="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-8">
+    <MasterCard className="p-4">
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-8">
         {rows.map((row) => {
           const heightPct = Math.max(8, (row.count / max) * 100);
-          const isPeak = row.count === max && row.count > 0;
           return (
-            <div key={row.label} className="flex flex-col items-center gap-2">
-              <div
-                className={`flex h-24 w-full items-end justify-center rounded-lg px-1 ${trackClass}`}
-              >
+            <div key={row.label} className="flex flex-col items-center gap-1">
+              <div className={`flex h-16 w-full items-end justify-center rounded-md px-0.5 ${trackClass}`}>
                 <div
-                  className={`w-full rounded-t-md shadow-sm transition-all ${barClass} ${
-                    isPeak ? "ring-2 ring-primary/40" : ""
-                  }`}
+                  className={`w-full rounded-t-sm ${barClass}`}
                   style={{ height: `${heightPct}%` }}
                   title={`${row.count}`}
                 />
               </div>
-              <p className="text-[10px] font-semibold text-muted-foreground">{row.label}</p>
-              <p className="text-xs font-black text-foreground">{row.count}</p>
+              <p className="text-[10px] text-muted-foreground">{row.label}</p>
+              <p className="text-xs font-semibold text-foreground">{row.count}</p>
             </div>
           );
         })}
       </div>
     </MasterCard>
   );
+}
+
+function formatStatus(status: string) {
+  return status
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export default function MasterInterviewAnalyticsPage() {
@@ -135,13 +133,13 @@ export default function MasterInterviewAnalyticsPage() {
           router.replace("/master-login");
           return;
         }
-        setError(body.error ?? "Unable to load interview analytics.");
+        setError(body.error ?? "Could not load analytics.");
         setData(null);
         return;
       }
       setData(body);
     } catch {
-      setError("Unable to reach the server.");
+      setError("Could not reach the server.");
       setData(null);
     } finally {
       setLoading(false);
@@ -155,67 +153,61 @@ export default function MasterInterviewAnalyticsPage() {
   const summary = data?.summary;
 
   return (
-    <MasterShell
-      title="Interview Analytics"
-      subtitle="Platform-wide interview creation and session activity across all companies."
-      topActions={
-        <button type="button" className={masterBtnGhost} onClick={() => void load()} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
-      }
-    >
-      <div className="space-y-6">
-        <MasterHero
-          badge="Creation + sessions"
-          title="Admin interview analytics"
-          subtitle="Track how companies create interview requirements, send invites, and conduct AI interviews."
-        >
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">Period</label>
-            <MasterSelect
-              value={period}
-              onValueChange={(value) => setPeriod(value as Period)}
-              className="max-w-[12rem] min-w-[11rem]"
-              aria-label="Analytics period"
-              options={[
-                { value: "7d", label: "Last 7 days" },
-                { value: "30d", label: "Last 30 days" },
-                { value: "90d", label: "Last 90 days" },
-                { value: "all", label: "All time" },
-              ]}
-            />
-          </div>
-        </MasterHero>
+    <MasterShell title="Interview analytics" subtitle="Jobs and interviews across companies.">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <MasterSelect
+            value={period}
+            onValueChange={(value) => setPeriod(value as Period)}
+            className="max-w-[11rem] min-w-[10rem]"
+            aria-label="Time range"
+            options={[
+              { value: "7d", label: "Last 7 days" },
+              { value: "30d", label: "Last 30 days" },
+              { value: "90d", label: "Last 90 days" },
+              { value: "all", label: "All time" },
+            ]}
+          />
+          <button
+            type="button"
+            className={`${masterBtnGhost} !px-2.5 !py-2`}
+            onClick={() => void load()}
+            disabled={loading}
+            aria-label="Refresh"
+            title="Refresh"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
 
         {error ? <MasterAlert variant="error">{error}</MasterAlert> : null}
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MasterKpiCard
-            label="Requirements created"
+            label="Jobs"
             value={summary?.requirementsInPeriod ?? "—"}
-            hint={`${summary?.totalRequirements ?? 0} total active`}
+            hint={`${summary?.totalRequirements ?? 0} total`}
             icon={ClipboardList}
             accent="bg-violet/12 text-violet ring-violet/25"
           />
           <MasterKpiCard
-            label="Invites sent"
+            label="Invites"
             value={summary?.invitesInPeriod ?? "—"}
-            hint={`${summary?.totalInvites ?? 0} all time`}
+            hint={`${summary?.totalInvites ?? 0} total`}
             icon={Mail}
             accent="bg-primary/12 text-primary ring-primary/25"
           />
           <MasterKpiCard
-            label="Sessions conducted"
+            label="Interviews"
             value={summary?.sessionsInPeriod ?? "—"}
-            hint={`${summary?.liveNow ?? 0} live now`}
+            hint={`${summary?.liveNow ?? 0} live`}
             icon={Briefcase}
             accent="bg-success/12 text-success ring-success/25"
           />
           <MasterKpiCard
-            label="Completion rate"
+            label="Completed"
             value={summary ? `${summary.completionRatePct}%` : "—"}
-            hint={`${summary?.completedInPeriod ?? 0} completed in period`}
+            hint={`${summary?.completedInPeriod ?? 0} in this range`}
             icon={CheckCircle2}
             accent="bg-warning/12 text-warning ring-warning/25"
           />
@@ -223,60 +215,48 @@ export default function MasterInterviewAnalyticsPage() {
 
         {data ? (
           <>
-            <div className="grid gap-4 xl:grid-cols-2">
+            <div className="grid gap-3 xl:grid-cols-2">
               <TrendBars
-                title="Interview requirements created (8 weeks)"
+                title="Jobs created"
                 rows={data.trends.requirementsCreated}
-                barClass="bg-gradient-to-t from-violet to-primary"
+                barClass="bg-violet-500"
               />
               <TrendBars
-                title="Company sessions conducted (8 weeks)"
+                title="Interviews"
                 rows={data.trends.sessionsConducted}
-                barClass="bg-gradient-to-t from-emerald-500 to-success"
+                barClass="bg-emerald-500"
               />
             </div>
 
-            <MasterCard elevated className="overflow-hidden">
-              <div className="border-b border-border px-5 py-4">
-                <h3 className="flex items-center gap-2 text-sm font-bold text-foreground">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  Per-company breakdown
-                </h3>
+            <MasterCard className="overflow-hidden">
+              <div className="border-b border-border px-4 py-3">
+                <h3 className="text-sm font-semibold text-foreground">By company</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className={masterTableHeadClass}>
-                      <th className="px-4 py-3 text-left">Company</th>
-                      <th className="px-4 py-3 text-left">Requirements</th>
-                      <th className="px-4 py-3 text-left">Invites (period)</th>
-                      <th className="px-4 py-3 text-left">Sessions</th>
-                      <th className="px-4 py-3 text-left">Completed (period)</th>
+                      <th className="px-4 py-2 text-left">Company</th>
+                      <th className="px-4 py-2 text-left">Jobs</th>
+                      <th className="px-4 py-2 text-left">Invites</th>
+                      <th className="px-4 py-2 text-left">Interviews</th>
+                      <th className="px-4 py-2 text-left">Completed</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.companyRows.map((row) => (
-                      <tr
-                        key={row.companyId}
-                        className="border-t border-border transition hover:bg-surface/40"
-                      >
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-foreground">{row.companyName}</p>
-                          <p className="text-xs text-muted-foreground">{row.domain}</p>
-                        </td>
-                        <td className="px-4 py-3 font-medium text-foreground">{row.totalRequirements}</td>
-                        <td className="px-4 py-3 font-medium text-foreground">{row.invitesInPeriod}</td>
-                        <td className="px-4 py-3 font-medium text-foreground">{row.totalSessions}</td>
-                        <td className="px-4 py-3 font-medium text-foreground">{row.completedInPeriod}</td>
+                      <tr key={row.companyId} className="border-t border-border">
+                        <td className="px-4 py-2 font-medium text-foreground">{row.companyName}</td>
+                        <td className="px-4 py-2 text-foreground">{row.totalRequirements}</td>
+                        <td className="px-4 py-2 text-foreground">{row.invitesInPeriod}</td>
+                        <td className="px-4 py-2 text-foreground">{row.totalSessions}</td>
+                        <td className="px-4 py-2 text-foreground">{row.completedInPeriod}</td>
                       </tr>
                     ))}
                     {!data.companyRows.length ? (
                       <tr>
-                        <td
-                          colSpan={5}
-                          className="px-4 py-8 text-center text-sm text-muted-foreground"
-                        >
-                          No company data for this period.
+                        <td colSpan={5} className="px-4 py-4 text-center text-sm text-muted-foreground">
+                          No companies yet.
                         </td>
                       </tr>
                     ) : null}
@@ -285,59 +265,85 @@ export default function MasterInterviewAnalyticsPage() {
               </div>
             </MasterCard>
 
-            <div className="grid gap-4 xl:grid-cols-2">
-              <MasterCard elevated className="overflow-hidden">
-                <div className="border-b border-border px-5 py-4">
-                  <h3 className="flex items-center gap-2 text-sm font-bold text-foreground">
-                    <TrendingUp className="h-4 w-4 text-violet" />
-                    Recent requirements
-                  </h3>
-                </div>
-                <ul className="divide-y divide-border">
-                  {data.recentRequirements.map((row) => (
-                    <li key={row.id} className="px-5 py-3 text-sm transition hover:bg-surface/40">
-                      <p className="font-semibold text-foreground">{row.roleTitle}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {row.companyName} · {row.invitesCount} invites · {row.sessionsCount} sessions ·{" "}
-                        {new Date(row.createdAt).toLocaleDateString()}
-                      </p>
-                    </li>
-                  ))}
-                  {!data.recentRequirements.length ? (
-                    <li className="px-5 py-8 text-center text-sm text-muted-foreground">
-                      No recent requirements.
-                    </li>
-                  ) : null}
-                </ul>
-              </MasterCard>
+            <MasterCard className="overflow-hidden">
+              <div className="border-b border-border px-4 py-3">
+                <h3 className="text-sm font-semibold text-foreground">Latest jobs</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className={masterTableHeadClass}>
+                      <th className="px-4 py-2 text-left">Role</th>
+                      <th className="px-4 py-2 text-left">Company</th>
+                      <th className="px-4 py-2 text-left">Invites</th>
+                      <th className="px-4 py-2 text-left">Interviews</th>
+                      <th className="px-4 py-2 text-left">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.recentRequirements.map((row) => (
+                      <tr key={row.id} className="border-t border-border">
+                        <td className="px-4 py-2 font-medium text-foreground">{row.roleTitle}</td>
+                        <td className="px-4 py-2 text-muted-foreground">{row.companyName}</td>
+                        <td className="px-4 py-2 text-foreground">{row.invitesCount}</td>
+                        <td className="px-4 py-2 text-foreground">{row.sessionsCount}</td>
+                        <td className="px-4 py-2 text-muted-foreground">
+                          {new Date(row.createdAt).toLocaleDateString("en-IN")}
+                        </td>
+                      </tr>
+                    ))}
+                    {!data.recentRequirements.length ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-4 text-center text-sm text-muted-foreground">
+                          No jobs in this range.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </MasterCard>
 
-              <MasterCard elevated className="overflow-hidden">
-                <div className="border-b border-border px-5 py-4">
-                  <h3 className="flex items-center gap-2 text-sm font-bold text-foreground">
-                    <BarChart3 className="h-4 w-4 text-success" />
-                    Recent conducted sessions
-                  </h3>
-                </div>
-                <ul className="divide-y divide-border">
-                  {data.recentSessions.map((row) => (
-                    <li key={row.id} className="px-5 py-3 text-sm transition hover:bg-surface/40">
-                      <p className="font-semibold text-foreground">
-                        {row.candidateName ?? row.candidateEmail ?? "Candidate"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {row.companyName ?? "—"} · {row.positionTitle ?? "Interview"} · {row.status}
-                        {row.overallScore != null ? ` · score ${row.overallScore}` : ""}
-                      </p>
-                    </li>
-                  ))}
-                  {!data.recentSessions.length ? (
-                    <li className="px-5 py-8 text-center text-sm text-muted-foreground">
-                      No recent sessions.
-                    </li>
-                  ) : null}
-                </ul>
-              </MasterCard>
-            </div>
+            <MasterCard className="overflow-hidden">
+              <div className="border-b border-border px-4 py-3">
+                <h3 className="text-sm font-semibold text-foreground">Latest interviews</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className={masterTableHeadClass}>
+                      <th className="px-4 py-2 text-left">Candidate</th>
+                      <th className="px-4 py-2 text-left">Company</th>
+                      <th className="px-4 py-2 text-left">Role</th>
+                      <th className="px-4 py-2 text-left">Status</th>
+                      <th className="px-4 py-2 text-left">Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.recentSessions.map((row) => (
+                      <tr key={row.id} className="border-t border-border">
+                        <td className="px-4 py-2 font-medium text-foreground">
+                          {row.candidateName ?? row.candidateEmail ?? "Candidate"}
+                        </td>
+                        <td className="px-4 py-2 text-muted-foreground">{row.companyName ?? "—"}</td>
+                        <td className="px-4 py-2 text-foreground">{row.positionTitle ?? "—"}</td>
+                        <td className="px-4 py-2 text-muted-foreground">{formatStatus(row.status)}</td>
+                        <td className="px-4 py-2 text-foreground">
+                          {row.overallScore != null ? row.overallScore : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                    {!data.recentSessions.length ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-4 text-center text-sm text-muted-foreground">
+                          No interviews in this range.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </MasterCard>
           </>
         ) : null}
       </div>

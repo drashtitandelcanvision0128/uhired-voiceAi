@@ -29,10 +29,6 @@ import {
 } from "@/components/master-pagination";
 import {
   MasterAlert,
-  MasterCard,
-  MasterHero,
-  MasterKpiCard,
-  MasterSelect,
   masterBtnGhost,
   masterBtnPrimary,
   masterInputClass,
@@ -119,13 +115,20 @@ const CATEGORY_ICONS: Record<LogCategory, typeof ScrollText> = {
 function formatTimestamp(value: string) {
   return new Date(value).toLocaleString("en-IN", {
     day: "numeric",
-    month: "numeric",
-    year: "numeric",
+    month: "short",
     hour: "numeric",
     minute: "2-digit",
-    second: "2-digit",
     hour12: true,
   });
+}
+
+function shortMeta(value: string) {
+  if (value.includes("@") && value.length > 32) {
+    const [local, domain] = value.split("@");
+    return `${local.slice(0, 10)}…@${domain}`;
+  }
+  if (value.length > 24) return `${value.slice(0, 10)}…${value.slice(-4)}`;
+  return value;
 }
 
 export default function MasterLogsPage() {
@@ -163,7 +166,7 @@ export default function MasterLogsPage() {
         return;
       }
       if (!res.ok) {
-        setError(payload.error ?? "Unable to load logs.");
+        setError(payload.error ?? "Could not load logs.");
         return;
       }
       setData(payload);
@@ -205,144 +208,73 @@ export default function MasterLogsPage() {
   }, [pageSize]);
 
   return (
-    <MasterShell
-      title="Platform Logs"
-      subtitle="Real-time activity feed — sessions, companies, payments, invites, and promo events."
-      topActions={
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className={`${masterBtnGhost} inline-flex items-center gap-2 !px-4 !py-2.5 disabled:opacity-60`}
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
-          Refresh logs
-        </button>
-      }
-    >
-      <div className="space-y-5">
+    <MasterShell title="Logs" subtitle="What happened on the platform.">
+      <div className="space-y-4">
         {error ? <MasterAlert variant="error">{error}</MasterAlert> : null}
 
-        <MasterHero
-          badge="Activity feed"
-          title="Platform logs"
-          subtitle="Important activities across the platform — practice sessions, company onboarding, payment verification, invites, and promo usage. Useful for debugging, monitoring, and audits."
-        />
-
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <MasterKpiCard
-            label="Total events"
-            value={data?.summary.totalLogs ?? 0}
-            icon={ScrollText}
-            accent="bg-primary/12 text-primary ring-primary/25"
-          />
-          <MasterKpiCard
-            label="Last 24 hours"
-            value={data?.summary.last24Hours ?? 0}
-            icon={Clock}
-            accent="bg-violet/12 text-violet ring-violet/25"
-          />
-          <MasterKpiCard
-            label="Warnings"
-            value={data?.summary.warnings ?? 0}
-            icon={AlertTriangle}
-            accent="bg-warning/12 text-warning ring-warning/25"
-          />
-          <MasterKpiCard
-            label="Errors"
-            value={data?.summary.errors ?? 0}
-            icon={XCircle}
-            accent="bg-destructive/12 text-destructive ring-destructive/25"
-          />
-          <MasterKpiCard
-            label="Live now"
-            value={data?.summary.liveSessions ?? 0}
-            icon={Activity}
-            accent="bg-success/12 text-success ring-success/25"
-          />
+          {[
+            { label: "Events", value: data?.summary.totalLogs ?? 0, icon: ScrollText, accent: "bg-primary/12 text-primary" },
+            { label: "Last 24h", value: data?.summary.last24Hours ?? 0, icon: Clock, accent: "bg-violet/12 text-violet" },
+            { label: "Warnings", value: data?.summary.warnings ?? 0, icon: AlertTriangle, accent: "bg-warning/12 text-warning" },
+            { label: "Errors", value: data?.summary.errors ?? 0, icon: XCircle, accent: "bg-destructive/12 text-destructive" },
+            { label: "Live", value: data?.summary.liveSessions ?? 0, icon: Activity, accent: "bg-success/12 text-success" },
+          ].map((card) => {
+            const Icon = card.icon;
+            return (
+              <article key={card.label} className="admin-card flex items-center gap-3 p-3.5">
+                <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${card.accent}`}>
+                  <Icon className="size-4" aria-hidden />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">{card.label}</p>
+                  <p className="text-lg font-semibold tracking-tight text-foreground">{card.value}</p>
+                </div>
+              </article>
+            );
+          })}
         </section>
 
-        <MasterCard
-          elevated
-          title="Activity log"
-          subtitle="Search and filter events across the platform."
-        >
-          <div className="mb-6 rounded-xl border border-border bg-surface/40 p-4 sm:p-5">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
-              <label className="block space-y-1.5">
-                <span className="admin-label">Search logs</span>
-                <div className="relative">
-                  <Search
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <input
-                    value={searchInput}
-                    onChange={(event) => setSearchInput(event.target.value)}
-                    onKeyDown={handleSearchKeyDown}
-                    placeholder="Title, message, actor, metadata..."
-                    className={`${masterInputClass} w-full pl-10`}
-                  />
-                </div>
-              </label>
-
-              <label className="block space-y-1.5">
-                <span className="admin-label">Category</span>
-                <MasterSelect
-                  value={categoryInput}
-                  onValueChange={(value) => setCategoryInput(value as "" | LogCategory)}
-                  className="w-full"
-                  aria-label="Filter by category"
-                  options={[
-                    { value: "", label: "All categories" },
-                    ...LOG_CATEGORY_OPTIONS.map((option) => ({
-                      value: option.value,
-                      label: option.label,
-                    })),
-                  ]}
+        <section className="admin-card overflow-hidden">
+          <div className="space-y-3 border-b border-border p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[14rem] flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Search activity"
+                  className={`${masterInputClass} w-full pl-10`}
+                  aria-label="Search logs"
                 />
-              </label>
-
-              <label className="block space-y-1.5">
-                <span className="admin-label">Level</span>
-                <MasterSelect
-                  value={levelInput}
-                  onValueChange={(value) => setLevelInput(value as "" | LogLevel)}
-                  className="w-full"
-                  aria-label="Filter by level"
-                  options={[
-                    { value: "", label: "All levels" },
-                    { value: "INFO", label: "Info" },
-                    { value: "SUCCESS", label: "Success" },
-                    { value: "WARNING", label: "Warning" },
-                    { value: "ERROR", label: "Error" },
-                  ]}
-                />
-              </label>
-
-              <div className="flex flex-wrap gap-2">
+              </div>
+              <button type="button" onClick={applyFilters} className={`${masterBtnPrimary} !px-4`}>
+                Search
+              </button>
+              <button
+                type="button"
+                onClick={() => void load()}
+                disabled={loading}
+                className={`${masterBtnGhost} inline-flex h-10 items-center justify-center !px-3 disabled:opacity-60`}
+                aria-label="Refresh"
+                title="Refresh"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              </button>
+              {hasActiveFilters ? (
                 <button
                   type="button"
-                  onClick={applyFilters}
-                  className={`${masterBtnPrimary} inline-flex items-center gap-2 !px-5`}
+                  onClick={clearFilters}
+                  className={`${masterBtnGhost} inline-flex h-10 items-center justify-center !px-3`}
+                  aria-label="Clear filters"
                 >
-                  <Search className="h-4 w-4" aria-hidden="true" />
-                  Search
+                  <X className="h-4 w-4" />
                 </button>
-                {hasActiveFilters ? (
-                  <button
-                    type="button"
-                    onClick={clearFilters}
-                    className={`${masterBtnGhost} inline-flex items-center gap-2 !px-4`}
-                  >
-                    <X className="h-4 w-4" aria-hidden="true" />
-                    Clear
-                  </button>
-                ) : null}
-              </div>
+              ) : null}
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {(["", "INFO", "SUCCESS", "WARNING", "ERROR"] as const).map((level) => (
                 <button
                   key={level || "all-levels"}
@@ -352,21 +284,17 @@ export default function MasterLogsPage() {
                     setAppliedLevel(level);
                     setPage(1);
                   }}
-                  className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
                     appliedLevel === level
-                      ? "text-primary-foreground shadow-[var(--shadow-glow)]"
-                      : "bg-surface/60 text-muted-foreground ring-1 ring-border hover:text-foreground"
+                      ? "bg-card text-foreground shadow-sm ring-1 ring-border"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
-                  style={
-                    appliedLevel === level ? { background: "var(--gradient-brand)" } : undefined
-                  }
                 >
-                  {level === "" ? "All levels" : level}
+                  {level === "" ? "All" : level === "INFO" ? "Info" : level === "SUCCESS" ? "Success" : level === "WARNING" ? "Warning" : "Error"}
                 </button>
               ))}
             </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
                 onClick={() => {
@@ -374,16 +302,13 @@ export default function MasterLogsPage() {
                   setAppliedCategory("");
                   setPage(1);
                 }}
-                className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
                   appliedCategory === ""
-                    ? "text-primary-foreground shadow-[var(--shadow-glow)]"
-                    : "bg-surface/60 text-muted-foreground ring-1 ring-border hover:text-foreground"
+                    ? "bg-card text-foreground shadow-sm ring-1 ring-border"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
-                style={
-                  appliedCategory === "" ? { background: "var(--gradient-brand)" } : undefined
-                }
               >
-                All categories
+                All
               </button>
               {LOG_CATEGORY_OPTIONS.map((option) => (
                 <button
@@ -394,152 +319,107 @@ export default function MasterLogsPage() {
                     setAppliedCategory(option.value);
                     setPage(1);
                   }}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
                     appliedCategory === option.value
-                      ? "text-primary-foreground shadow-[var(--shadow-glow)]"
-                      : "bg-surface/60 text-muted-foreground ring-1 ring-border hover:text-foreground"
+                      ? "bg-card text-foreground shadow-sm ring-1 ring-border"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
-                  style={
-                    appliedCategory === option.value
-                      ? { background: "var(--gradient-brand)" }
-                      : undefined
-                  }
                 >
                   {option.label}
                 </button>
               ))}
             </div>
-
-            {hasActiveFilters ? (
-              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                  Active filters
-                </span>
-                {appliedSearch ? (
-                  <span className="rounded-full bg-surface/80 px-2.5 py-1 text-xs font-medium text-foreground ring-1 ring-border">
-                    Search: {appliedSearch}
-                  </span>
-                ) : null}
-                {appliedCategory ? (
-                  <span className="rounded-full bg-surface/80 px-2.5 py-1 text-xs font-medium text-foreground ring-1 ring-border">
-                    Category: {appliedCategory}
-                  </span>
-                ) : null}
-                {appliedLevel ? (
-                  <span className="rounded-full bg-surface/80 px-2.5 py-1 text-xs font-medium text-foreground ring-1 ring-border">
-                    Level: {appliedLevel}
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
           </div>
 
           {loading && !(data?.logs.length ?? 0) ? (
-            <div className="space-y-3">
+            <div className="space-y-2 p-4">
               {[1, 2, 3, 4].map((n) => (
-                <div key={n} className="h-28 animate-pulse rounded-2xl bg-surface/60" />
+                <div key={n} className="h-14 animate-pulse rounded-lg bg-muted" />
               ))}
             </div>
+          ) : !(data?.logs.length ?? 0) ? (
+            <div className="px-4 py-10 text-center">
+              <p className="text-sm font-semibold text-foreground">No matching events</p>
+              {hasActiveFilters ? (
+                <button type="button" onClick={clearFilters} className={`${masterBtnGhost} mt-3 inline-flex items-center gap-1.5`}>
+                  <X className="h-4 w-4" />
+                  Clear filters
+                </button>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">Activity will show up here.</p>
+              )}
+            </div>
           ) : (
-          <div className="space-y-3">
-            {(data?.logs ?? []).map((log) => {
-              const levelMeta = LEVEL_STYLES[log.level];
-              const LevelIcon = levelMeta.icon;
-              const CategoryIcon = CATEGORY_ICONS[log.category] ?? ScrollText;
-              return (
-                <article
-                  key={log.id}
-                  className="glow-card rounded-2xl border border-border bg-surface/30 p-4 transition hover:border-primary/20 hover:bg-surface/50 sm:p-5"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex min-w-0 flex-1 gap-3">
+            <ul className="divide-y divide-border">
+              {(data?.logs ?? []).map((log) => {
+                const levelMeta = LEVEL_STYLES[log.level];
+                const CategoryIcon = CATEGORY_ICONS[log.category] ?? ScrollText;
+                const metaEntries = Object.entries(log.metadata);
+                return (
+                  <li key={log.id} className="px-4 py-3 hover:bg-muted/40">
+                    <div className="flex items-start gap-3">
                       <span
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ${levelMeta.accent}`}
+                        className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ring-1 ${levelMeta.accent}`}
                       >
-                        <CategoryIcon className="h-4 w-4" aria-hidden="true" />
+                        <CategoryIcon className="h-3.5 w-3.5" aria-hidden />
                       </span>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <p className="font-semibold text-foreground">{log.title}</p>
                           <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ring-1 ${levelMeta.className}`}
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ring-1 ${levelMeta.className}`}
                           >
-                            <LevelIcon className="h-3 w-3" aria-hidden="true" />
-                            {log.level}
+                            {log.level === "INFO" ? "Info" : log.level === "SUCCESS" ? "Success" : log.level === "WARNING" ? "Warning" : "Error"}
                           </span>
                           <span
-                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ring-1 ${
-                              CATEGORY_STYLES[log.category] ?? "bg-surface/80 text-muted-foreground ring-border"
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ring-1 ${
+                              CATEGORY_STYLES[log.category] ?? "bg-muted text-muted-foreground ring-border"
                             }`}
                           >
                             {log.category}
                           </span>
+                          <time className="ml-auto text-xs text-muted-foreground">{formatTimestamp(log.timestamp)}</time>
                         </div>
-                        <p className="mt-1.5 text-sm leading-relaxed text-foreground/90">{log.message}</p>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          Actor: <span className="font-medium text-foreground">{log.actor}</span>
-                        </p>
-                        {Object.keys(log.metadata).length ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {Object.entries(log.metadata).map(([key, value]) => (
-                              <span
-                                key={key}
-                                className="rounded-lg bg-surface/60 px-2.5 py-1 text-[10px] font-semibold text-foreground ring-1 ring-border"
-                              >
-                                {key}: {value}
-                              </span>
-                            ))}
-                          </div>
+                        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{log.message}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{log.actor}</p>
+                        {metaEntries.length ? (
+                          <details className="mt-1.5">
+                            <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
+                              Details
+                            </summary>
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              {metaEntries.map(([key, value]) => (
+                                <span
+                                  key={key}
+                                  title={`${key}: ${value}`}
+                                  className="rounded-md bg-muted px-2 py-0.5 font-mono text-[10px] text-foreground"
+                                >
+                                  {key}: {shortMeta(value)}
+                                </span>
+                              ))}
+                            </div>
+                          </details>
                         ) : null}
                       </div>
                     </div>
-                    <time className="shrink-0 text-xs font-medium text-muted-foreground">
-                      {formatTimestamp(log.timestamp)}
-                    </time>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+                  </li>
+                );
+              })}
+            </ul>
           )}
 
           <MasterPagination
             page={page}
             pageSize={pageSize}
             totalItems={data?.pagination.total ?? 0}
-            itemLabel="log entries"
+            itemLabel="events"
             onPageChange={setPage}
             onPageSizeChange={(size) => {
               setPageSize(size);
               setPage(1);
             }}
           />
-
-          {loading && (data?.logs.length ?? 0) > 0 ? (
-            <p className="mt-4 text-sm text-muted-foreground">Refreshing logs…</p>
-          ) : null}
-          {!loading && !(data?.logs.length ?? 0) ? (
-            <div className="mt-4 rounded-2xl border border-dashed border-border bg-surface/30 px-4 py-10 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/12 text-primary ring-1 ring-primary/25">
-                <ScrollText className="h-6 w-6" aria-hidden />
-              </div>
-              <p className="mt-4 text-sm font-semibold text-foreground">No log entries match your filters</p>
-              <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                Events appear here when sessions, companies, payments, or invites are created on the platform.
-              </p>
-              {hasActiveFilters ? (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className={`${masterBtnGhost} mt-4 inline-flex items-center gap-2`}
-                >
-                  <X className="h-4 w-4" aria-hidden />
-                  Clear filters
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-        </MasterCard>
+        </section>
       </div>
     </MasterShell>
   );

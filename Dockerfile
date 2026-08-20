@@ -1,4 +1,4 @@
-# Base image
+# Coolify / production image for Uhired (Next.js standalone)
 FROM node:20-alpine AS base
 
 # Install dependencies only when needed
@@ -19,6 +19,20 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Build-time public env (set these as Coolify "Build Variables" / ARG)
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_RAZORPAY_KEY_ID
+ARG NEXT_PUBLIC_INTERVIEW_DURATION_SEC
+ARG NEXT_PUBLIC_PAYMENTS_ENABLED
+ARG NEXT_PUBLIC_INTERVIEW_PRICE_PAISE
+ARG NEXT_PUBLIC_INTERVIEW_CURRENCY
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
+    NEXT_PUBLIC_RAZORPAY_KEY_ID=$NEXT_PUBLIC_RAZORPAY_KEY_ID \
+    NEXT_PUBLIC_INTERVIEW_DURATION_SEC=$NEXT_PUBLIC_INTERVIEW_DURATION_SEC \
+    NEXT_PUBLIC_PAYMENTS_ENABLED=$NEXT_PUBLIC_PAYMENTS_ENABLED \
+    NEXT_PUBLIC_INTERVIEW_PRICE_PAISE=$NEXT_PUBLIC_INTERVIEW_PRICE_PAISE \
+    NEXT_PUBLIC_INTERVIEW_CURRENCY=$NEXT_PUBLIC_INTERVIEW_CURRENCY
 
 # Generate Prisma Client
 RUN npx prisma generate
@@ -63,5 +77,8 @@ EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 ENTRYPOINT ["./docker-entrypoint.sh"]

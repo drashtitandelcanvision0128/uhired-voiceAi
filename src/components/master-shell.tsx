@@ -13,15 +13,16 @@ import {
   FileText,
   LayoutDashboard,
   Plus,
+  BookOpen,
   LifeBuoy,
   LogOut,
   Newspaper,
   ScrollText,
   Settings,
   Shield,
-  ShieldAlert,
   TicketPercent,
   User,
+  UserCog,
 } from "lucide-react";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { MasterGlobalSearch } from "@/components/master-global-search";
@@ -36,25 +37,26 @@ type MasterShellProps = {
 
 const platformNavItems = [
   { href: "/master/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/master/companies", label: "Company Management", icon: Building2 },
-  { href: "/master/company-sessions", label: "Company Interviews", icon: Briefcase },
-  { href: "/master/interview-analytics", label: "Interview Analytics", icon: BarChart3 },
-  { href: "/master/practice-sessions", label: "Practice Interviews", icon: ScrollText },
-  { href: "/master/stuck-sessions", label: "Stuck Interviews", icon: AlertTriangle },
+  { href: "/master/companies", label: "Companies", icon: Building2 },
+  { href: "/master/company-sessions", label: "Company interviews", icon: Briefcase },
+  { href: "/master/interview-analytics", label: "Interview analytics", icon: BarChart3 },
+  { href: "/master/practice-sessions", label: "Practice interviews", icon: ScrollText },
+  { href: "/master/stuck-sessions", label: "Stuck interviews", icon: AlertTriangle },
   { href: "/master/payments", label: "Payments", icon: CreditCard },
-  { href: "/master/promo-codes", label: "Promo Codes", icon: TicketPercent },
-  { href: "/master/user-analytics", label: "User Analytics", icon: BarChart3 },
+  { href: "/master/promo-codes", label: "Promo codes", icon: TicketPercent },
+  { href: "/master/user-analytics", label: "User analytics", icon: BarChart3 },
   { href: "/master/blog", label: "Blog", icon: Newspaper },
-  { href: "/master/content", label: "Careers Pages", icon: ClipboardList },
+  { href: "/master/content", label: "Careers", icon: ClipboardList },
 ];
 
 const systemNavItems = [
+  { href: "/master/admins", label: "Master admins", icon: UserCog },
   { href: "/master/logs", label: "Logs", icon: FileText },
   { href: "/master/support", label: "Support", icon: LifeBuoy },
-  { href: "/master/data-deletion-requests", label: "Data Deletion", icon: ShieldAlert },
   { href: "/master/security", label: "Security", icon: Shield },
-  { href: "/master/system-settings", label: "System Settings", icon: Settings },
+  { href: "/master/system-settings", label: "Settings", icon: Settings },
   { href: "/master/reports", label: "Reports", icon: FileBarChart },
+  { href: "/master/help-center", label: "Help", icon: BookOpen },
   { href: "/master/profile", label: "Profile", icon: User },
 ];
 
@@ -81,8 +83,8 @@ export function MasterShell({ title, subtitle, children, topActions }: MasterShe
       headerSearch={<MasterGlobalSearch />}
       headerActions={<MasterHeaderControls onLogout={logout} middleActions={topActions} />}
       primaryAction={{
-        label: "Generate Report",
-        href: "/master/reports",
+        label: "Add company",
+        href: "/master/companies/new",
         icon: Plus,
       }}
       secondaryAction={{
@@ -118,7 +120,7 @@ export function MasterShell({ title, subtitle, children, topActions }: MasterShe
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">Master Admin</p>
-            <p className="text-muted-foreground truncate text-xs">Platform Super Admin</p>
+            <p className="text-muted-foreground truncate text-xs">Super admin</p>
           </div>
           <button
             type="button"

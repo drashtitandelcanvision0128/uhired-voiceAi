@@ -39,8 +39,8 @@ const masterHighlights = [
   },
   {
     Icon: Shield,
-    title: "Secure master login",
-    copy: "Protected sign-in with login history and trusted devices.",
+    title: "Secure sign-in",
+    copy: "Login history and trusted devices.",
   },
 ];
 
@@ -98,13 +98,13 @@ export default function MasterLoginPage() {
 
   return (
     <AuthShell
-      eyebrow="Master login"
+      eyebrow="Admin sign-in"
       title={
         <>
-          Welcome back to <span className="text-gradient">Master Control</span>
+          Sign in to <span className="text-gradient">Uhired</span>
         </>
       }
-      subtitle="Sign in to manage companies, interviews, payments, and platform settings."
+      subtitle="Manage companies, interviews, payments, and settings."
       highlights={masterHighlights}
       footer={
         <>
@@ -114,7 +114,7 @@ export default function MasterLoginPage() {
           <p className="mt-3">
             Having trouble?{" "}
             <Link href="/contact" className="font-semibold text-primary hover:text-cyan no-underline">
-              Contact system administrator
+              Contact support
             </Link>
           </p>
         </>
@@ -176,7 +176,7 @@ export default function MasterLoginPage() {
           style={{ background: "var(--gradient-brand)", boxShadow: "var(--shadow-glow)" }}
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-          Continue to dashboard <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          Sign in <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </button>
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
       </form>

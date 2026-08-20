@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       trustDevice,
       sessionTtlSec: trustDevice ? 60 * 60 * 24 * 30 : 60 * 45,
     });
-    setMasterSessionCookie(response, { trustDevice });
+    setMasterSessionCookie(response, { trustDevice, email: loginEmail });
     return response;
   } catch (error) {
     if (error instanceof z.ZodError) {

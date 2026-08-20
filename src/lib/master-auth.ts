@@ -92,53 +92,67 @@ export function assertMasterAdminCredentials(
   return { ok: true };
 }
 
-export function createMasterSessionToken(nowMs = Date.now(), ttlSec = MASTER_SESSION_TTL_SEC) {
+type MasterSessionPayload = {
+  exp?: number;
+  nonce?: string;
+  email?: string;
+};
+
+export function createMasterSessionToken(
+  nowMs = Date.now(),
+  ttlSec = MASTER_SESSION_TTL_SEC,
+  email?: string,
+) {
   const exp = Math.floor(nowMs / 1000) + ttlSec;
   const nonce = randomBytes(16).toString("hex");
-  const payload = encodeBase64Url(JSON.stringify({ exp, nonce }));
+  const payload = encodeBase64Url(
+    JSON.stringify({
+      exp,
+      nonce,
+      ...(email ? { email: email.trim().toLowerCase() } : {}),
+    }),
+  );
   return `${payload}.${sign(payload)}`;
 }
 
-export function getMasterSessionExpiry(token: string | undefined | null) {
+function parseMasterSessionPayload(token: string | undefined | null): MasterSessionPayload | null {
   if (!token) return null;
 
-  const [payload] = token.split(".");
-  if (!payload) return null;
-
-  try {
-    const parsed = JSON.parse(decodeBase64Url(payload)) as { exp?: number };
-    const exp = typeof parsed.exp === "number" ? parsed.exp : 0;
-    if (!exp) return null;
-    return new Date(exp * 1000);
-  } catch {
-    return null;
-  }
-}
-
-export function verifyMasterSessionToken(token: string | undefined | null) {
-  if (!token) {
-    return false;
-  }
-
   const [payload, signature] = token.split(".");
-  if (!payload || !signature) {
-    return false;
-  }
+  if (!payload || !signature) return null;
 
   const expectedSignature = sign(payload);
   const sigA = Buffer.from(signature, "utf8");
   const sigB = Buffer.from(expectedSignature, "utf8");
   if (sigA.length !== sigB.length || !timingSafeEqual(sigA, sigB)) {
-    return false;
+    return null;
   }
 
   try {
-    const parsed = JSON.parse(decodeBase64Url(payload)) as { exp?: number };
-    const exp = typeof parsed.exp === "number" ? parsed.exp : 0;
-    return exp > Math.floor(Date.now() / 1000);
+    return JSON.parse(decodeBase64Url(payload)) as MasterSessionPayload;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export function getMasterSessionExpiry(token: string | undefined | null) {
+  const parsed = parseMasterSessionPayload(token);
+  const exp = typeof parsed?.exp === "number" ? parsed.exp : 0;
+  if (!exp) return null;
+  return new Date(exp * 1000);
+}
+
+export function getMasterSessionEmail(token: string | undefined | null) {
+  const parsed = parseMasterSessionPayload(token);
+  const email = typeof parsed?.email === "string" ? parsed.email.trim().toLowerCase() : "";
+  return email || null;
+}
+
+export function verifyMasterSessionToken(token: string | undefined | null) {
+  const parsed = parseMasterSessionPayload(token);
+  if (!parsed) return false;
+  const exp = typeof parsed.exp === "number" ? parsed.exp : 0;
+  return exp > Math.floor(Date.now() / 1000);
 }
 
 export function getCookieValueFromHeader(header: string | null, name: string) {
@@ -161,14 +175,19 @@ export function hasMasterSessionFromRequest(request: Request) {
   return verifyMasterSessionToken(token);
 }
 
+export function getMasterSessionEmailFromRequest(request: Request) {
+  const token = getCookieValueFromHeader(request.headers.get("cookie"), MASTER_SESSION_COOKIE);
+  return getMasterSessionEmail(token);
+}
+
 export function setMasterSessionCookie(
   response: NextResponse,
-  options?: { trustDevice?: boolean },
+  options?: { trustDevice?: boolean; email?: string },
 ) {
   const ttlSec = options?.trustDevice ? MASTER_TRUSTED_SESSION_TTL_SEC : MASTER_SESSION_TTL_SEC;
   response.cookies.set({
     name: MASTER_SESSION_COOKIE,
-    value: createMasterSessionToken(Date.now(), ttlSec),
+    value: createMasterSessionToken(Date.now(), ttlSec, options?.email),
     httpOnly: true,
     sameSite: "lax",
     secure: env.isProduction,

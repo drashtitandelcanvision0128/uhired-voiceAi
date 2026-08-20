@@ -14,6 +14,7 @@ import {
   VideoOff,
 } from "lucide-react";
 import Link from "next/link";
+import { BrandLogoMark } from "@/components/brand-logo";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
 import { INTERVIEW_CONSENT_SUMMARY } from "@/lib/interview-consent";
 import {
@@ -1324,6 +1325,9 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
     async (elapsed: number, blob: Blob): Promise<void> => {
       const mimeType = blob.type || "video/webm";
       const sizeBytes = blob.size;
+      const maxAttempts = 3;
+
+      const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
       const fallbackApiUpload = async () => {
         const formData = new FormData();
@@ -1344,76 +1348,99 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
         console.log(`[Video Upload] Multipart upload success for session ${sessionId}`);
       };
 
-      const urlResponse = await fetch(`/api/interview/${sessionId}/video/upload-url`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mimeType, sizeBytes }),
-      });
-
-      if (!urlResponse.ok) {
-        console.log(
-          `[Video Upload] Presigned URL unavailable for session ${sessionId}, using multipart upload`,
-        );
-        await fallbackApiUpload();
-        return;
-      }
-
-      const { uploadUrl } = (await urlResponse.json()) as { uploadUrl?: string };
-      if (!uploadUrl) {
-        console.log(`[Video Upload] Missing presigned URL for session ${sessionId}, using multipart upload`);
-        await fallbackApiUpload();
-        return;
-      }
-
-      console.log(
-        `[Video Upload] Got presigned URL for session ${sessionId}, uploading ${sizeBytes} bytes`,
-      );
-
-      try {
-        const response = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": mimeType },
-          body: blob,
+      const attemptUpload = async () => {
+        const urlResponse = await fetch(`/api/interview/${sessionId}/video/upload-url`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mimeType, sizeBytes }),
         });
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => "No error body");
-          console.error(
-            `[Video Upload] S3 upload failed for session ${sessionId}:`,
-            response.status,
-            response.statusText,
-            errorText,
+
+        if (!urlResponse.ok) {
+          console.log(
+            `[Video Upload] Presigned URL unavailable for session ${sessionId}, using multipart upload`,
           );
-          throw new Error(`S3 upload failed with status ${response.status}: ${errorText}`);
+          await fallbackApiUpload();
+          return;
         }
-        console.log(`[Video Upload] S3 upload success for session ${sessionId}`);
-      } catch (error) {
-        console.error(`[Video Upload] S3 fetch error for session ${sessionId}:`, error);
-        console.log(`[Video Upload] Falling back to multipart upload for session ${sessionId}`);
-        await fallbackApiUpload();
-        return;
-      }
 
-      const metadataResponse = await fetch(`/api/interview/${sessionId}/video/metadata`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        keepalive: true,
-        body: JSON.stringify({ mimeType, sizeBytes, durationSec: elapsed }),
-      });
+        const { uploadUrl } = (await urlResponse.json()) as { uploadUrl?: string };
+        if (!uploadUrl) {
+          console.log(`[Video Upload] Missing presigned URL for session ${sessionId}, using multipart upload`);
+          await fallbackApiUpload();
+          return;
+        }
 
-      if (!metadataResponse.ok) {
-        console.error(
-          `[Video Upload] Failed to update metadata for session ${sessionId}:`,
-          metadataResponse.status,
-          metadataResponse.statusText,
+        console.log(
+          `[Video Upload] Got presigned URL for session ${sessionId}, uploading ${sizeBytes} bytes`,
         );
-      } else {
+
+        try {
+          const response = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": mimeType },
+            body: blob,
+          });
+          if (!response.ok) {
+            const errorText = await response.text().catch(() => "No error body");
+            console.error(
+              `[Video Upload] S3 upload failed for session ${sessionId}:`,
+              response.status,
+              response.statusText,
+              errorText,
+            );
+            throw new Error(`S3 upload failed with status ${response.status}: ${errorText}`);
+          }
+          console.log(`[Video Upload] S3 upload success for session ${sessionId}`);
+        } catch (error) {
+          console.error(`[Video Upload] S3 fetch error for session ${sessionId}:`, error);
+          console.log(`[Video Upload] Falling back to multipart upload for session ${sessionId}`);
+          await fallbackApiUpload();
+          return;
+        }
+
+        const metadataResponse = await fetch(`/api/interview/${sessionId}/video/metadata`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          keepalive: true,
+          body: JSON.stringify({ mimeType, sizeBytes, durationSec: elapsed }),
+        });
+
+        if (!metadataResponse.ok) {
+          console.error(
+            `[Video Upload] Failed to update metadata for session ${sessionId}:`,
+            metadataResponse.status,
+            metadataResponse.statusText,
+          );
+          throw new Error(`Video metadata update failed with status ${metadataResponse.status}`);
+        }
         console.log(`[Video Upload] Metadata updated for session ${sessionId}`);
+      };
+
+      let lastError: unknown = null;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+          await attemptUpload();
+          return;
+        } catch (error) {
+          lastError = error;
+          console.error(
+            `[Video Upload] Attempt ${attempt}/${maxAttempts} failed for session ${sessionId}:`,
+            error,
+          );
+          if (attempt < maxAttempts) {
+            await sleep(1000 * attempt);
+          }
+        }
       }
+
+      throw lastError instanceof Error
+        ? lastError
+        : new Error("Unable to upload interview recording after retries.");
     },
     [sessionId],
   );
 
-  /** Stop MediaRecorder and resolve once the blob is ready — upload continues in background. */
+  /** Stop MediaRecorder, upload the blob (with retries), and resolve when upload finishes. */
   const kickOffRecordingUpload = useCallback(
     (elapsed: number): Promise<void> => {
       console.log(
@@ -1423,30 +1450,42 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
       const recorder = mediaRecorderRef.current;
       if (!recorder) {
         console.error(`[Video Upload] No recorder found for session ${sessionId}`);
-        return Promise.resolve();
+        return Promise.reject(new Error("Interview recording was not started."));
       }
       setIsRecording(false);
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
         let settled = false;
-        const finish = () => {
+        const finishOk = () => {
           if (settled) return;
           settled = true;
           resolve();
         };
-        const stopTimeout = window.setTimeout(finish, 30_000);
+        const finishErr = (error: unknown) => {
+          if (settled) return;
+          settled = true;
+          reject(error instanceof Error ? error : new Error("Unable to save interview recording."));
+        };
+        const stopTimeout = window.setTimeout(() => {
+          finishErr(new Error("Timed out while finalizing the interview recording."));
+        }, 30_000);
         recorder.onstop = () => {
           window.clearTimeout(stopTimeout);
           mediaRecorderRef.current = null;
-          try {
-            const blob = new Blob(recordingChunksRef.current, {
-              type: recorder.mimeType || "video/webm",
-            });
-            recordingChunksRef.current = [];
-            if (blob.size > 0) {
+          void (async () => {
+            try {
+              const blob = new Blob(recordingChunksRef.current, {
+                type: recorder.mimeType || "video/webm",
+              });
+              recordingChunksRef.current = [];
+              if (blob.size <= 0) {
+                finishErr(new Error("Interview recording was empty."));
+                return;
+              }
               setVideoUploadPending(true);
               const uploadTask = uploadRecordingBlob(elapsed, blob)
                 .catch((error) => {
                   console.error(`[Video Upload] Error for session ${sessionId}:`, error);
+                  throw error;
                 })
                 .finally(() => {
                   setVideoUploadPending(false);
@@ -1454,19 +1493,27 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
               uploadInFlightRef.current = uploadTask.finally(() => {
                 uploadInFlightRef.current = null;
               });
-              void uploadInFlightRef.current;
+              await uploadInFlightRef.current;
+              finishOk();
+            } catch (error) {
+              console.error(`[Video Upload] Error preparing upload for session ${sessionId}:`, error);
+              finishErr(error);
             }
-          } catch (error) {
-            console.error(`[Video Upload] Error preparing upload for session ${sessionId}:`, error);
-          }
-          finish();
+          })();
         };
         try {
+          if (recorder.state === "recording") {
+            try {
+              recorder.requestData();
+            } catch {
+              // Some browsers reject requestData; stop() still flushes the final chunk.
+            }
+          }
           recorder.stop();
-        } catch {
+        } catch (error) {
           window.clearTimeout(stopTimeout);
           mediaRecorderRef.current = null;
-          finish();
+          finishErr(error);
         }
       });
     },
@@ -1482,6 +1529,7 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
       settlePause();
       setStage("ending");
       completionBeaconSentRef.current = false;
+      let videoUploadFailed = false;
 
       // Freeze the interview clock before Whisper drain / upload so duration and
       // late transcript fallbacks match the allocated slot, not wall-clock overhead.
@@ -1500,14 +1548,17 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
         );
       }
 
-      // Stop MediaRecorder now so the blob length tracks the interview clock
-      // (not Whisper wait / complete API time). Video upload continues in background.
-      const recordingStopPromise = kickOffRecordingUpload(elapsed);
+      // Stop MediaRecorder and wait for a durable upload before completing the session.
+      try {
+        await kickOffRecordingUpload(elapsed);
+      } catch (uploadError) {
+        videoUploadFailed = true;
+        console.error(`[Video Upload] Final upload failed for session ${sessionId}:`, uploadError);
+      }
 
       // Allow in-flight Whisper results to arrive before tearing down the data channel.
       await waitForPendingCandidateTranscripts();
       cleanupRealtimeOnly();
-      await recordingStopPromise;
       cleanupConnectionRef.current();
 
       try {
@@ -1526,6 +1577,11 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
         }
         completionBeaconSentRef.current = true;
         setStage("post");
+        if (videoUploadFailed) {
+          setError(
+            "Your interview was saved, but the video recording could not be uploaded. Please contact support if the hiring team needs the recording.",
+          );
+        }
         clearInterviewState(sessionId);
       } catch (finishError) {
         setStage("error");
@@ -2744,7 +2800,7 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
       if (interviewerStarting) return `${interviewerPanelLabel} starting…`;
       return formatLivePhaseStatus(livePhase, interviewerPanelLabel);
     }
-    if (stage === "ending") return "Saving your interview…";
+    if (stage === "ending") return "Saving recording and generating AI scorecard…";
     if (stage === "post") return "Interview complete.";
     return "Check devices, then start the voice interview.";
   }, [interviewerPanelLabel, interviewerStarting, livePhase, pauseReason, stage, visibilityBlocked]);
@@ -2802,23 +2858,25 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
 
   if (stage === "post") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#eceef0] px-6 py-16">
-        <div className="max-w-lg rounded-2xl bg-white p-10 text-center shadow-xl">
-          <h2 className="text-2xl font-extrabold text-[#1d3557]">Thank you</h2>
-          <p className="mt-3 text-sm text-slate-600">
+      <div className="admin-shell flex min-h-screen flex-col items-center justify-center bg-background px-6 py-16">
+        <div className="admin-card max-w-lg p-10 text-center">
+          <h2 className="text-2xl font-extrabold text-foreground">Thank you</h2>
+          <p className="mt-3 text-sm text-muted-foreground">
             {sessionType === "COMPANY"
               ? "Your voice interview is complete. Your transcript and scorecard are saved for the hiring team."
               : "Your voice interview is complete. Your transcript and scorecard are saved."}
           </p>
           {videoUploadPending ? (
-            <p className="mt-2 text-xs text-amber-700">
+            <p className="mt-2 text-xs text-warning">
               Your video recording is still uploading. Please keep this tab open for a moment.
             </p>
+          ) : error ? (
+            <p className="mt-2 text-xs text-destructive">{error}</p>
           ) : null}
           <Link
             href="/"
             replace
-            className="mt-8 inline-flex rounded-lg bg-[#1d3557] px-6 py-3 text-sm font-bold text-white"
+            className="admin-btn-primary mt-8 inline-flex !px-6 !py-3 !text-sm"
           >
             Go to homepage
           </Link>
@@ -2829,45 +2887,47 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
 
   return (
     <div
-      className="interview-room flex min-h-[100dvh] flex-col bg-[#eef2f6] text-[#0f172a] dark:bg-background dark:text-foreground"
+      className="admin-shell interview-room flex min-h-[100dvh] flex-col bg-background text-foreground"
       style={sessionType === "COMPANY" ? (brandingCssVars as CSSProperties) : undefined}
     >
-      <header className="flex h-[4.25rem] shrink-0 items-center justify-between border-b border-[#1d3557]/10 bg-white/85 px-4 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-xl sm:px-6 dark:border-border dark:bg-card/90">
+      <header className="flex h-[4.25rem] shrink-0 items-center justify-between border-b border-border bg-card/90 px-4 backdrop-blur-xl sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           {brandLogoUrl && sessionType === "COMPANY" ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={brandLogoUrl}
               alt=""
-              className="h-9 w-9 shrink-0 rounded-lg object-contain ring-1 ring-[#1d3557]/10"
+              className="h-9 w-9 shrink-0 rounded-lg object-contain ring-1 ring-border"
             />
-          ) : null}
+          ) : (
+            <BrandLogoMark variant="theme" size={32} />
+          )}
           <div className="min-w-0">
             <span
-              className="font-display block truncate text-lg font-extrabold tracking-tight"
+              className="font-display block truncate text-lg font-extrabold tracking-tight text-foreground"
               style={headerBrandColor ? { color: headerBrandColor } : undefined}
             >
               {headerBrandLabel}
             </span>
-            <span className="hidden text-[10px] font-semibold uppercase tracking-[0.14em] text-[#64748b] sm:block">
+            <span className="hidden text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:block">
               Live interview room
             </span>
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
-          <span className="rounded-full border border-[#1d3557]/10 bg-[#f8fafc] px-3 py-1.5 font-mono text-sm font-bold tabular-nums text-[#1d3557] dark:border-border dark:bg-surface dark:text-foreground">
+          <span className="rounded-full border border-border bg-muted px-3 py-1.5 font-mono text-sm font-bold tabular-nums text-foreground">
             {formatClock(displayedRemainingSec)}
           </span>
           <button
             type="button"
-            className="rounded-xl p-2.5 text-[#64748b] ring-1 ring-transparent transition hover:bg-[#f1f5f9] hover:text-[#1d3557] hover:ring-[#1d3557]/10"
+            className="rounded-xl p-2.5 text-muted-foreground ring-1 ring-transparent transition hover:bg-muted hover:text-foreground hover:ring-border"
             aria-label="Notifications"
           >
             <Bell className="h-5 w-5" />
           </button>
           <button
             type="button"
-            className="rounded-xl p-2.5 text-[#64748b] ring-1 ring-transparent transition hover:bg-[#f1f5f9] hover:text-[#1d3557] hover:ring-[#1d3557]/10"
+            className="rounded-xl p-2.5 text-muted-foreground ring-1 ring-transparent transition hover:bg-muted hover:text-foreground hover:ring-border"
             aria-label="Settings"
           >
             <Settings className="h-5 w-5" />
@@ -2877,31 +2937,31 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
 
       <div className="mx-auto flex min-h-0 w-full max-w-[88rem] flex-1 flex-col gap-3 p-3 sm:gap-4 sm:p-5">
         {error ? (
-          <p className="shrink-0 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          <p className="shrink-0 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
             {error}
           </p>
         ) : null}
         {stage === "ending" ? (
-          <div className="shrink-0 rounded-xl border border-amber-300/80 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <div className="shrink-0 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-foreground">
             <p className="font-semibold">
               {shouldRecordVideo
-                ? "Saving your interview and recording. Please do not close this tab."
-                : "Saving your interview. Please do not close this tab."}
+                ? "Uploading your recording and generating the AI scorecard. Please do not close this tab."
+                : "Generating your AI scorecard. Please do not close this tab."}
             </p>
-            <p className="mt-1 text-xs text-amber-800">
+            <p className="mt-1 text-xs text-muted-foreground">
               {shouldRecordVideo
-                ? "This usually takes under 15 seconds. Your video recording will finish uploading in the background after you see the thank-you screen."
-                : "This usually takes under 15 seconds. Detailed answer scoring continues in the background for the hiring team."}
+                ? "We finish the video upload and AI analysis before showing the thank-you screen so the hiring team gets a complete scorecard."
+                : "AI analysis runs before you leave so the hiring team gets a complete scorecard."}
             </p>
           </div>
         ) : null}
 
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
-          <div className="relative min-h-[220px] overflow-hidden rounded-2xl bg-gradient-to-br from-[#0b1c33] via-[#16324f] to-[#1d4a6e] shadow-[0_16px_40px_rgba(15,23,42,0.18)] ring-1 ring-white/10 lg:min-h-[300px]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(14,116,144,0.28),transparent_45%)]" />
+          <div className="relative min-h-[220px] overflow-hidden rounded-2xl bg-gradient-to-br from-[oklch(0.28_0.06_165)] via-[oklch(0.36_0.08_165)] to-[oklch(0.45_0.1_165)] shadow-[0_16px_40px_rgba(15,23,42,0.18)] ring-1 ring-primary/20 lg:min-h-[300px]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklab,var(--primary)_35%,transparent),transparent_45%)]" />
             <div className="absolute inset-0 opacity-40 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:28px_28px]" />
             <div className="relative flex h-full min-h-[220px] flex-col items-center justify-center px-6 text-center lg:min-h-[300px]">
-              <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-white/10 ring-1 ring-white/20 shadow-[0_0_40px_rgba(14,116,144,0.35)]">
+              <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-white/10 ring-1 ring-white/20 shadow-[0_0_40px_color-mix(in_oklab,var(--primary)_40%,transparent)]">
                 {statusVisual.showSpinner ? (
                   <LoaderCircle className="h-8 w-8 animate-spin text-white/90" />
                 ) : (
@@ -2924,7 +2984,7 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
             </div>
           </div>
 
-          <div className="relative min-h-[220px] overflow-hidden rounded-2xl bg-[#0f172a] shadow-[0_16px_40px_rgba(15,23,42,0.18)] ring-1 ring-[#1d3557]/15 lg:min-h-[300px]">
+          <div className="relative min-h-[220px] overflow-hidden rounded-2xl bg-card shadow-[0_16px_40px_rgba(15,23,42,0.12)] ring-1 ring-border lg:min-h-[300px]">
             <video
               ref={videoRef}
               autoPlay
@@ -2933,9 +2993,9 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
               className="h-full w-full scale-x-[-1] object-cover"
             />
             {!permissionReady ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#0f172a]/70 px-6 text-center backdrop-blur-[2px]">
-                <Video className="h-8 w-8 text-white/70" />
-                <p className="text-sm font-semibold text-white/90">Camera preview after device check</p>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/80 px-6 text-center backdrop-blur-[2px]">
+                <Video className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm font-semibold text-foreground">Camera preview after device check</p>
               </div>
             ) : null}
             {stage === "live" && visibilityBlocked ? (
@@ -2970,22 +3030,22 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
         </div>
 
         {stage === "preflight" || stage === "error" ? (
-          <div className="flex shrink-0 flex-col gap-3 rounded-2xl border border-[#1d3557]/10 bg-white/90 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] backdrop-blur-sm sm:p-5">
+          <div className="admin-card flex shrink-0 flex-col gap-3 p-4 sm:p-5">
             {!initialConsentAcceptedAt ? (
-              <label className="flex items-start gap-3 rounded-xl border border-[#1d3557]/8 bg-[#f8fafc] px-4 py-3 text-sm text-[#334155]">
+              <label className="flex items-start gap-3 rounded-xl border border-border bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
                 <input
                   type="checkbox"
-                  className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-[#1d3557] focus:ring-[#1d3557]/20"
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-border text-primary focus:ring-primary/20"
                   checked={consentChecked}
                   onChange={(event) => setConsentChecked(event.target.checked)}
                 />
                 <span>
                   {INTERVIEW_CONSENT_SUMMARY}{" "}
-                  <Link href="/terms" className="font-semibold text-[#1d3557] hover:underline">
+                  <Link href="/terms" className="font-semibold text-primary hover:underline">
                     Terms
                   </Link>
                   {" · "}
-                  <Link href="/privacy" className="font-semibold text-[#1d3557] hover:underline">
+                  <Link href="/privacy" className="font-semibold text-primary hover:underline">
                     Privacy
                   </Link>
                 </span>
@@ -2995,7 +3055,7 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
               <button
                 type="button"
                 onClick={() => void handlePreflight()}
-                className="rounded-xl border border-[#1d3557]/15 bg-white px-4 py-2.5 text-sm font-bold text-[#1d3557] shadow-sm transition hover:bg-[#f8fafc]"
+                className="admin-btn-ghost !px-4 !py-2.5 !text-sm"
               >
                 Check camera &amp; mic
               </button>
@@ -3010,7 +3070,7 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
                       ? "Turn on your camera to start the interview"
                       : undefined
                 }
-                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#0e7490] to-[#1d3557] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(29,53,87,0.28)] transition hover:brightness-105 disabled:opacity-50"
+                className="admin-btn-primary inline-flex items-center gap-2 !px-5 !py-2.5 !text-sm disabled:opacity-50"
               >
                 {isStarting ? (
                   <>
@@ -3026,7 +3086,7 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
               </button>
             </div>
             {permissionReady && !camOn ? (
-              <p className="text-xs font-semibold text-red-600">
+              <p className="text-xs font-semibold text-destructive">
                 Camera is off. Turn on your camera below to start the interview.
               </p>
             ) : null}
@@ -3034,13 +3094,13 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
         ) : null}
 
         {showLiveTranscript && (stage === "live" || stage === "connecting" || stage === "ending") ? (
-          <div className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div className="admin-card shrink-0 px-4 py-3">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 Live transcript
               </p>
               {livePhase === "processing" ? (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-warning">
                   <LoaderCircle className="h-3 w-3 animate-spin" />
                   Processing audio…
                 </span>
@@ -3048,31 +3108,31 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
             </div>
             <div className="max-h-36 space-y-2 overflow-y-auto text-sm">
               {liveTranscriptLines.length === 0 && !liveInterviewerPartial ? (
-                <p className="text-slate-500">Transcript will appear here as you speak.</p>
+                <p className="text-muted-foreground">Transcript will appear here as you speak.</p>
               ) : null}
               {liveTranscriptLines.map((line) => (
-                <p key={line.id} className="leading-snug text-slate-700">
-                  <span className="font-bold text-[#1d3557]">{line.speaker}:</span> {line.text}
+                <p key={line.id} className="leading-snug text-foreground">
+                  <span className="font-bold text-primary">{line.speaker}:</span> {line.text}
                 </p>
               ))}
               {liveInterviewerPartial ? (
-                <p className="leading-snug text-slate-600">
-                  <span className="font-bold text-[#1d3557]">{interviewerPanelLabel}:</span>{" "}
+                <p className="leading-snug text-muted-foreground">
+                  <span className="font-bold text-primary">{interviewerPanelLabel}:</span>{" "}
                   {liveInterviewerPartial}
-                  <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-[#006a62]" />
+                  <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-primary" />
                 </p>
               ) : null}
             </div>
           </div>
         ) : null}
 
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#1d3557]/10 bg-white/95 px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] backdrop-blur-sm md:px-6">
+        <div className="admin-card flex shrink-0 flex-wrap items-center justify-between gap-4 px-4 py-3.5 md:px-6">
           <div className="flex items-center gap-2 md:gap-3">
             <button
               type="button"
               onClick={() => setCamOn((c) => !c)}
               className={`flex flex-col items-center gap-1 rounded-xl px-3 py-2 transition ${
-                camOn ? "bg-[#0e7490]/10 text-[#0e7490]" : "text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#1d3557]"
+                camOn ? "bg-primary/12 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
               {camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
@@ -3082,7 +3142,7 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
               type="button"
               onClick={() => setMicOn((m) => !m)}
               className={`flex flex-col items-center gap-1 rounded-xl px-3 py-2 transition ${
-                micOn ? "bg-[#0e7490]/10 text-[#0e7490]" : "text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#1d3557]"
+                micOn ? "bg-primary/12 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
               {micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
@@ -3095,8 +3155,8 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
               title="Show live speech-to-text transcript"
               className={`flex flex-col items-center gap-1 rounded-xl px-3 py-2 transition ${
                 showLiveTranscript
-                  ? "bg-[#0e7490]/10 text-[#0e7490]"
-                  : "text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#1d3557]"
+                  ? "bg-primary/12 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
               <Captions className="h-5 w-5" />
@@ -3108,44 +3168,44 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
             <div
               className={`flex max-w-md items-center gap-3 rounded-full border px-5 py-2.5 ${
                 statusVisual.tone === "processing"
-                  ? "border-amber-200 bg-amber-50"
+                  ? "border-warning/30 bg-warning/10"
                   : statusVisual.tone === "connecting"
-                    ? "border-slate-200 bg-slate-50"
+                    ? "border-border bg-muted"
                     : statusVisual.tone === "thinking"
-                      ? "border-violet-200 bg-violet-50"
+                      ? "border-violet/30 bg-violet/10"
                       : statusVisual.tone === "speaking"
-                        ? "border-sky-200 bg-sky-50"
+                        ? "border-cyan/30 bg-cyan/10"
                         : statusVisual.tone === "you-speaking"
-                          ? "border-emerald-200 bg-emerald-50"
-                          : "border-[#0e7490]/20 bg-[#0e7490]/10"
+                          ? "border-success/30 bg-success/10"
+                          : "border-primary/20 bg-primary/10"
               }`}
             >
               {statusVisual.showSpinner ? (
                 <LoaderCircle
                   className={`h-4 w-4 shrink-0 animate-spin ${
                     statusVisual.tone === "thinking"
-                      ? "text-violet-700"
+                      ? "text-violet"
                       : statusVisual.tone === "connecting"
-                        ? "text-slate-600"
-                        : "text-amber-700"
+                        ? "text-muted-foreground"
+                        : "text-warning"
                   }`}
                 />
               ) : statusVisual.pulse ? (
                 <div className="flex gap-1">
                   <span
                     className={`h-4 w-1 animate-bounce rounded-full ${
-                      statusVisual.tone === "you-speaking" ? "bg-emerald-700" : "bg-[#0e7490]"
+                      statusVisual.tone === "you-speaking" ? "bg-success" : "bg-primary"
                     }`}
                   />
                   <span
                     className={`h-6 w-1 animate-bounce rounded-full ${
-                      statusVisual.tone === "you-speaking" ? "bg-emerald-700" : "bg-[#0e7490]"
+                      statusVisual.tone === "you-speaking" ? "bg-success" : "bg-primary"
                     }`}
                     style={{ animationDelay: "0.1s" }}
                   />
                   <span
                     className={`h-5 w-1 animate-bounce rounded-full ${
-                      statusVisual.tone === "you-speaking" ? "bg-emerald-700" : "bg-[#0e7490]"
+                      statusVisual.tone === "you-speaking" ? "bg-success" : "bg-primary"
                     }`}
                     style={{ animationDelay: "0.2s" }}
                   />
@@ -3154,16 +3214,16 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
               <span
                 className={`truncate text-sm font-bold ${
                   statusVisual.tone === "processing"
-                    ? "text-amber-800"
+                    ? "text-warning"
                     : statusVisual.tone === "connecting"
-                      ? "text-slate-700"
+                      ? "text-muted-foreground"
                       : statusVisual.tone === "thinking"
-                        ? "text-violet-800"
+                        ? "text-violet"
                         : statusVisual.tone === "speaking"
-                          ? "text-sky-800"
+                          ? "text-cyan"
                           : statusVisual.tone === "you-speaking"
-                            ? "text-emerald-800"
-                            : "text-[#0f766e]"
+                            ? "text-success"
+                            : "text-primary"
                 }`}
               >
                 {statusCenter}
@@ -3173,15 +3233,15 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
 
           <div className="ml-auto flex items-center gap-3 md:gap-4">
             <div className="hidden flex-col items-end md:flex">
-              <div className="mb-1 flex w-32 justify-between text-[10px] font-bold text-[#64748b]">
+              <div className="mb-1 flex w-32 justify-between text-[10px] font-bold text-muted-foreground">
                 <span>Progress</span>
                 <span>
                   {progressCurrent} of {totalSteps}
                 </span>
               </div>
-              <div className="h-1.5 w-32 overflow-hidden rounded-full bg-[#e2e8f0]">
+              <div className="h-1.5 w-32 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-[#0e7490] to-[#1d3557] transition-all"
+                  className="h-full rounded-full bg-primary transition-all"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
@@ -3190,7 +3250,7 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
               type="button"
               onClick={() => void finishInterview("manual")}
               disabled={stage !== "live" && stage !== "connecting"}
-              className="whitespace-nowrap rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-bold text-red-600 shadow-sm transition hover:bg-red-50 disabled:opacity-40"
+              className="whitespace-nowrap rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm font-bold text-destructive transition hover:bg-destructive/15 disabled:opacity-40"
             >
               <span className="inline-flex items-center gap-2">
                 <PhoneOff className="h-4 w-4" />
@@ -3206,49 +3266,46 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
               <LoaderCircle
                 className={`h-3.5 w-3.5 shrink-0 animate-spin ${
                   statusVisual.tone === "thinking"
-                    ? "text-violet-700"
+                    ? "text-violet"
                     : statusVisual.tone === "connecting"
-                      ? "text-slate-600"
-                      : "text-amber-700"
+                      ? "text-muted-foreground"
+                      : "text-warning"
                 }`}
               />
             ) : statusVisual.pulse ? (
               <div className="flex gap-0.5">
                 <span
                   className={`h-3 w-0.5 animate-bounce rounded-full ${
-                    statusVisual.tone === "you-speaking" ? "bg-emerald-700" : "bg-[#006a62]"
+                    statusVisual.tone === "you-speaking" ? "bg-success" : "bg-primary"
                   }`}
                 />
                 <span
                   className={`h-4 w-0.5 animate-bounce rounded-full ${
-                    statusVisual.tone === "you-speaking" ? "bg-emerald-700" : "bg-[#006a62]"
+                    statusVisual.tone === "you-speaking" ? "bg-success" : "bg-primary"
                   }`}
                   style={{ animationDelay: "0.1s" }}
                 />
                 <span
                   className={`h-3.5 w-0.5 animate-bounce rounded-full ${
-                    statusVisual.tone === "you-speaking" ? "bg-emerald-700" : "bg-[#006a62]"
+                    statusVisual.tone === "you-speaking" ? "bg-success" : "bg-primary"
                   }`}
                   style={{ animationDelay: "0.2s" }}
                 />
               </div>
             ) : null}
-            <p className="text-xs font-bold text-[#006a62]">{statusCenter}</p>
+            <p className="text-xs font-bold text-primary">{statusCenter}</p>
           </div>
         </div>
       </div>
 
-      <footer className="shrink-0 border-t border-slate-200 bg-white py-4">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-6 text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500 md:flex-row">
-          <span>© 2024 Uhired. All rights reserved.</span>
+      <footer className="shrink-0 border-t border-border bg-card py-4">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-6 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground md:flex-row">
+          <span>© {new Date().getFullYear()} Uhired. All rights reserved.</span>
           <div className="flex gap-6">
-            <a
-              href="/privacy"
-              className="cursor-pointer hover:text-[#1d3557] no-underline"
-            >
+            <a href="/privacy" className="cursor-pointer no-underline hover:text-foreground">
               Privacy
             </a>
-            <span className="cursor-pointer hover:text-[#1d3557]">Support</span>
+            <span className="cursor-pointer hover:text-foreground">Support</span>
           </div>
         </div>
       </footer>

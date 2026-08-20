@@ -13,10 +13,9 @@ import {
 import { MasterCompanySessionDetailModal } from "@/components/master-company-session-detail-modal";
 import {
   MasterAlert,
-  MasterCard,
-  MasterHero,
   MasterKpiCard,
   MasterSelect,
+  formatMasterStatus,
   masterBtnGhost,
   masterBtnPrimary,
   masterInputClass,
@@ -159,6 +158,21 @@ export default function MasterCompanySessionsPage() {
   }, [searchParams, viewDetails]);
 
   useEffect(() => {
+    const q = searchParams.get("search");
+    if (q) {
+      setSearchInput(q);
+      setAppliedSearch(q);
+      setPage(1);
+    }
+    const status = searchParams.get("status");
+    if (status === "LIVE" || status === "READY" || status === "COMPLETED") {
+      setStatusInput(status);
+      setAppliedStatus(status);
+      setPage(1);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     void load();
   }, [load]);
 
@@ -198,17 +212,8 @@ export default function MasterCompanySessionsPage() {
   }
 
   return (
-    <MasterShell
-      title="Company Interviews"
-      subtitle="Monitor and manage hiring interviews across all companies on the platform."
-      topActions={
-        <button type="button" onClick={() => void load()} className={`${masterBtnGhost} inline-flex items-center gap-2 !px-4 !py-2.5`}>
-          <RefreshCw className="h-4 w-4" />
-          Refresh
-        </button>
-      }
-    >
-      <div className="space-y-5">
+    <MasterShell title="Company interviews" subtitle="Hiring interviews run by companies.">
+      <div className="space-y-3">
         {error ? <MasterAlert variant="error">{error}</MasterAlert> : null}
         {success ? <MasterAlert variant="success">{success}</MasterAlert> : null}
 
@@ -222,215 +227,212 @@ export default function MasterCompanySessionsPage() {
             deleteBusy={details !== null && deleteLoadingId === details.id}
           />
         ) : (
-        <>
-        <MasterHero
-          badge="HIRING SESSIONS"
-          title="Company interview monitoring"
-          subtitle="Track candidate interviews created by company admins — view transcripts, scores, and session status."
-        />
+          <>
+            <section className="grid gap-2 sm:grid-cols-3">
+              <MasterKpiCard
+                label="Sessions"
+                value={data?.metrics.totalSessions ?? 0}
+                icon={Briefcase}
+                accent="bg-primary/12 text-primary ring-primary/25"
+              />
+              <MasterKpiCard
+                label="Live now"
+                value={data?.metrics.activeNow ?? 0}
+                icon={Clock}
+                accent="bg-violet/12 text-violet ring-violet/25"
+              />
+              <MasterKpiCard
+                label="Completed"
+                value={data?.metrics.completedCount ?? 0}
+                icon={CheckCircle2}
+                accent="bg-success/12 text-success ring-success/25"
+              />
+            </section>
 
-        <section className="grid gap-3 sm:grid-cols-3">
-          <MasterKpiCard
-            label="Total Sessions"
-            value={data?.metrics.totalSessions ?? 0}
-            icon={Briefcase}
-            accent="bg-primary/12 text-primary ring-primary/25"
-          />
-          <MasterKpiCard
-            label="Live Now"
-            value={data?.metrics.activeNow ?? 0}
-            icon={Clock}
-            accent="bg-violet/12 text-violet ring-violet/25"
-          />
-          <MasterKpiCard
-            label="Completed"
-            value={data?.metrics.completedCount ?? 0}
-            icon={CheckCircle2}
-            accent="bg-success/12 text-success ring-success/25"
-          />
-        </section>
-
-        <MasterCard
-          elevated
-          title="Company interview sessions"
-          subtitle="Search by candidate, company, role, or domain. Filter by session status."
-        >
-          <div className="mb-5 rounded-xl border border-border bg-surface/40 p-4 sm:p-5">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto] lg:items-end">
-              <label className="block space-y-1.5">
-                <span className="admin-label">Search sessions</span>
-                <div className="relative">
-                  <Search
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden
-                  />
-                  <input
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        setAppliedSearch(searchInput.trim());
-                        setPage(1);
-                      }
-                    }}
-                    placeholder="Candidate, company, role, domain..."
-                    className={`${masterInputClass} w-full pl-10`}
-                  />
-                </div>
-              </label>
-
-              <label className="block space-y-1.5">
-                <span className="admin-label">Status</span>
-                <MasterSelect
-                  value={statusInput}
-                  onValueChange={(value) => setStatusInput(value as typeof statusInput)}
-                  className="w-full"
-                  aria-label="Filter by status"
-                  options={[
-                    { value: "", label: "All statuses" },
-                    { value: "LIVE", label: "LIVE" },
-                    { value: "READY", label: "READY" },
-                    { value: "COMPLETED", label: "COMPLETED" },
-                  ]}
-                />
-              </label>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAppliedSearch(searchInput.trim());
-                    setAppliedStatus(statusInput);
-                    setPage(1);
-                  }}
-                  className={`${masterBtnPrimary} inline-flex items-center gap-2 !px-5`}
-                >
-                  <Search className="h-4 w-4" aria-hidden />
-                  Search
-                </button>
-                {hasActiveFilters ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchInput("");
-                      setStatusInput("");
-                      setAppliedSearch("");
-                      setAppliedStatus("");
-                      setPage(1);
-                    }}
-                    className={`${masterBtnGhost} inline-flex items-center gap-1.5 !px-4`}
-                  >
-                    <X className="h-4 w-4" aria-hidden />
-                    Clear
-                  </button>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {(["", "LIVE", "READY", "COMPLETED"] as const).map((status) => (
-                <button
-                  key={status || "all"}
-                  type="button"
-                  onClick={() => {
-                    setStatusInput(status);
-                    setAppliedStatus(status);
-                    setPage(1);
-                  }}
-                  className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
-                    appliedStatus === status
-                      ? "text-primary-foreground shadow-[var(--shadow-glow)]"
-                      : "bg-surface/60 text-muted-foreground ring-1 ring-border hover:text-foreground"
-                  }`}
-                  style={
-                    appliedStatus === status ? { background: "var(--gradient-brand)" } : undefined
-                  }
-                >
-                  {status === "" ? "All" : status}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] text-left text-sm">
-              <thead>
-                <tr className={masterTableHeadClass}>
-                  <th className="py-2 pr-3">Date</th>
-                  <th className="pr-3">Candidate</th>
-                  <th className="pr-3">Company</th>
-                  <th className="pr-3">Role / Track</th>
-                  <th className="pr-3">Status</th>
-                  <th className="pr-3">Score</th>
-                  <th className="w-10 text-right"> </th>
-                </tr>
-              </thead>
-              <tbody>
-                {(data?.rows ?? []).map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-border transition-colors hover:bg-surface/40"
-                  >
-                    <td className="py-3.5 pr-3 text-xs text-muted-foreground">
-                      {new Date(row.createdAt).toLocaleString()}
-                    </td>
-                    <td className="pr-3">
-                      <p className="font-semibold text-foreground">{row.candidateName}</p>
-                      <p className="text-xs text-muted-foreground">{row.candidateEmail}</p>
-                    </td>
-                    <td className="pr-3 font-medium text-foreground">{row.companyName}</td>
-                    <td className="pr-3">
-                      <p className="font-semibold text-foreground">{row.positionTitle}</p>
-                      <p className="text-xs text-muted-foreground">{row.domain}</p>
-                    </td>
-                    <td className="pr-3">
-                      <MasterStatusBadge status={row.status} />
-                    </td>
-                    <td className="pr-3">
-                      {row.score != null ? (
-                        <span className="text-sm font-bold text-foreground">{row.score}</span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="text-right">
-                      <MasterRowActionsMenu
-                        label={row.candidateName}
-                        actions={[
-                          {
-                            label: detailsLoadingId === row.id ? "Loading..." : "View",
-                            icon: Eye,
-                            onClick: () => void viewDetails(row.id),
-                            disabled: detailsLoadingId === row.id,
-                          },
-                          {
-                            label: deleteLoadingId === row.id ? "Deleting..." : "Delete",
-                            onClick: () => void deleteSession(row.id),
-                            danger: true,
-                            disabled: deleteLoadingId === row.id,
-                          },
-                        ]}
+            <section className="admin-card overflow-hidden">
+              <div className="space-y-3 p-3">
+                <div className="grid gap-2 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,12rem)_auto] lg:items-end">
+                  <label className="block space-y-1">
+                    <span className="admin-label">Search</span>
+                    <div className="relative">
+                      <Search
+                        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                        aria-hidden
                       />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      <input
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            setAppliedSearch(searchInput.trim());
+                            setAppliedStatus(statusInput);
+                            setPage(1);
+                          }
+                        }}
+                        placeholder="Name, company, or role"
+                        className={`${masterInputClass} w-full pl-10`}
+                      />
+                    </div>
+                  </label>
 
-          <MasterPagination
-            page={page}
-            pageSize={pageSize}
-            totalItems={data?.pagination.total ?? 0}
-            itemLabel="sessions"
-            onPageChange={setPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setPage(1);
-            }}
-          />
-        </MasterCard>
-        </>
+                  <label className="block space-y-1">
+                    <span className="admin-label">Status</span>
+                    <MasterSelect
+                      value={statusInput}
+                      onValueChange={(value) => setStatusInput(value as typeof statusInput)}
+                      className="w-full"
+                      aria-label="Filter by status"
+                      options={[
+                        { value: "", label: "All" },
+                        { value: "LIVE", label: "Live" },
+                        { value: "READY", label: "Ready" },
+                        { value: "COMPLETED", label: "Completed" },
+                      ]}
+                    />
+                  </label>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppliedSearch(searchInput.trim());
+                        setAppliedStatus(statusInput);
+                        setPage(1);
+                      }}
+                      className={`${masterBtnPrimary} inline-flex h-10 items-center gap-2 !px-4`}
+                    >
+                      <Search className="h-4 w-4" aria-hidden />
+                      Search
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void load()}
+                      className={`${masterBtnGhost} inline-flex h-10 items-center justify-center !px-3`}
+                      aria-label="Refresh"
+                      title="Refresh"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </button>
+                    {hasActiveFilters ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchInput("");
+                          setStatusInput("");
+                          setAppliedSearch("");
+                          setAppliedStatus("");
+                          setPage(1);
+                        }}
+                        className={`${masterBtnGhost} inline-flex h-10 items-center justify-center !px-3`}
+                        aria-label="Clear"
+                      >
+                        <X className="h-4 w-4" aria-hidden />
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {(["", "LIVE", "READY", "COMPLETED"] as const).map((status) => (
+                    <button
+                      key={status || "all"}
+                      type="button"
+                      onClick={() => {
+                        setStatusInput(status);
+                        setAppliedStatus(status);
+                        setPage(1);
+                      }}
+                      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                        appliedStatus === status
+                          ? "text-primary-foreground"
+                          : "bg-surface/60 text-muted-foreground ring-1 ring-border hover:text-foreground"
+                      }`}
+                      style={
+                        appliedStatus === status ? { background: "var(--gradient-brand)" } : undefined
+                      }
+                    >
+                      {status === "" ? "All" : formatMasterStatus(status)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[960px] text-left text-sm">
+                  <thead>
+                    <tr className={masterTableHeadClass}>
+                      <th className="px-3 py-2">Date</th>
+                      <th className="pr-3">Candidate</th>
+                      <th className="pr-3">Company</th>
+                      <th className="pr-3">Role</th>
+                      <th className="pr-3">Status</th>
+                      <th className="pr-3">Score</th>
+                      <th className="w-10 pr-3 text-right"> </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data?.rows ?? []).map((row) => (
+                      <tr key={row.id} className="border-b border-border last:border-0 hover:bg-muted/40">
+                        <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                          {new Date(row.createdAt).toLocaleString()}
+                        </td>
+                        <td className="pr-3">
+                          <p className="font-semibold text-foreground">{row.candidateName}</p>
+                          <p className="text-xs text-muted-foreground">{row.candidateEmail}</p>
+                        </td>
+                        <td className="pr-3 font-medium text-foreground">{row.companyName}</td>
+                        <td className="pr-3">
+                          <p className="font-semibold text-foreground">{row.positionTitle}</p>
+                          <p className="text-xs text-muted-foreground">{row.domain}</p>
+                        </td>
+                        <td className="pr-3">
+                          <MasterStatusBadge status={row.status} />
+                        </td>
+                        <td className="pr-3">
+                          {row.score != null ? (
+                            <span className="text-sm font-semibold text-foreground">{row.score}</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="pr-3 text-right">
+                          <MasterRowActionsMenu
+                            label={row.candidateName}
+                            actions={[
+                              {
+                                label: detailsLoadingId === row.id ? "Loading…" : "View",
+                                icon: Eye,
+                                onClick: () => void viewDetails(row.id),
+                                disabled: detailsLoadingId === row.id,
+                              },
+                              {
+                                label: deleteLoadingId === row.id ? "Deleting…" : "Delete",
+                                onClick: () => void deleteSession(row.id),
+                                danger: true,
+                                disabled: deleteLoadingId === row.id,
+                              },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <MasterPagination
+                page={page}
+                pageSize={pageSize}
+                totalItems={data?.pagination.total ?? 0}
+                itemLabel="sessions"
+                onPageChange={setPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setPage(1);
+                }}
+              />
+            </section>
+          </>
         )}
       </div>
     </MasterShell>

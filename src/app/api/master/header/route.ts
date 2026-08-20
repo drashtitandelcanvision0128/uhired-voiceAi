@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hasMasterSessionFromRequest } from "@/lib/master-auth";
-import { resolveMasterAdminEmail } from "@/lib/master-admin-account";
-import { countSupportInquiriesByStatus, listSupportInquiries } from "@/lib/support-inquiry-db";
+import {
+  getMasterAdminEmail,
+  getMasterSessionEmailFromRequest,
+  hasMasterSessionFromRequest,
+} from "@/lib/master-auth";
+import { getMasterAdminAccountByEmail, resolveMasterAdminEmail } from "@/lib/master-admin-account";
+import { buildStuckSessionWhere } from "@/lib/master-stuck-sessions";
+import {
+  countSupportInquiriesByStatus,
+  listSupportInquiries,
+} from "@/lib/support-inquiry-db";
 
 type HeaderNotification = {
   id: string;
@@ -13,15 +21,21 @@ type HeaderNotification = {
   unread?: boolean;
 };
 
-function getMasterProfileEmail() {
-  return process.env.MASTER_ADMIN_EMAIL?.trim().toLowerCase() || "master@uhired.com";
+function getMasterProfileEmailFallback() {
+  return getMasterAdminEmail() || "master@uhired.com";
 }
 
-async function loadMasterProfileEmail() {
+async function loadMasterProfileEmail(request: Request) {
   try {
+    const sessionEmail = getMasterSessionEmailFromRequest(request);
+    if (sessionEmail) {
+      const account = await getMasterAdminAccountByEmail(prisma, sessionEmail);
+      if (account?.email) return account.email;
+      return sessionEmail;
+    }
     return await resolveMasterAdminEmail(prisma);
   } catch {
-    return getMasterProfileEmail();
+    return getMasterProfileEmailFallback();
   }
 }
 
@@ -42,21 +56,21 @@ export async function GET(request: Request) {
   }
 
   try {
-    const email = await loadMasterProfileEmail();
+    const email = await loadMasterProfileEmail(request);
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-    const liveSessions = await prisma.interviewSession.count({ where: { status: "LIVE" } });
-    const newSupportCount = await countSupportInquiriesByStatus(prisma, "NEW");
-    const recentCompanies = await prisma.company.count({
-      where: { createdAt: { gte: oneDayAgo } },
-    });
-    const recentPracticeSessions = await prisma.interviewSession.count({
-      where: {
-        sessionType: "PRACTICE",
-        createdAt: { gte: oneDayAgo },
-      },
-    });
+    const [livePractice, liveCompany, stuckCount, newSupportCount, recentCompanies, recentPracticeSessions] =
+      await Promise.all([
+        prisma.interviewSession.count({ where: { status: "LIVE", sessionType: "PRACTICE" } }),
+        prisma.interviewSession.count({ where: { status: "LIVE", sessionType: "COMPANY" } }),
+        prisma.interviewSession.count({ where: buildStuckSessionWhere() }),
+        countSupportInquiriesByStatus(prisma, "NEW"),
+        prisma.company.count({ where: { createdAt: { gte: oneDayAgo } } }),
+        prisma.interviewSession.count({
+          where: { sessionType: "PRACTICE", createdAt: { gte: oneDayAgo } },
+        }),
+      ]);
 
     const latestSupportRows = await listSupportInquiries(prisma, {
       where: { status: "NEW" },
@@ -66,11 +80,33 @@ export async function GET(request: Request) {
 
     const notifications: HeaderNotification[] = [];
 
-    if (liveSessions > 0) {
+    if (stuckCount > 0) {
       notifications.push({
-        id: "live-sessions",
-        title: "Live interviews",
-        body: `${liveSessions} interview${liveSessions === 1 ? "" : "s"} happening right now.`,
+        id: "stuck-sessions",
+        title: "Stuck interviews",
+        body: `${stuckCount} interview${stuckCount === 1 ? "" : "s"} live or waiting for more than 1 hour.`,
+        time: "Now",
+        href: "/master/stuck-sessions",
+        unread: true,
+      });
+    }
+
+    if (liveCompany > 0) {
+      notifications.push({
+        id: "live-company",
+        title: "Live company interviews",
+        body: `${liveCompany} hiring interview${liveCompany === 1 ? "" : "s"} happening right now.`,
+        time: "Now",
+        href: "/master/company-sessions?status=LIVE",
+        unread: true,
+      });
+    }
+
+    if (livePractice > 0) {
+      notifications.push({
+        id: "live-practice",
+        title: "Live practice interviews",
+        body: `${livePractice} practice interview${livePractice === 1 ? "" : "s"} happening right now.`,
         time: "Now",
         href: "/master/practice-sessions",
         unread: true,

@@ -14,6 +14,7 @@ import {
   Network,
   type LucideIcon,
 } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 
 const FIELD_LABEL_CLASS =
   "block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500";
@@ -54,26 +55,16 @@ type LoginContext = {
 };
 
 function UhiredLogo({ variant = "dark" }: { variant?: "dark" | "light" }) {
+  const onDark = variant === "dark";
   return (
-    <div className="inline-flex items-center gap-2.5">
-      <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#0052cc]">
-        <svg
-          viewBox="0 0 24 24"
-          className="h-4 w-4 text-white"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          <path d="M6 8h12v2H6V8zm0 4h8v2H6v-2zm0 4h10v2H6v-2z" />
-        </svg>
-      </span>
-      <span
-        className={`text-xl font-bold tracking-tight ${
-          variant === "dark" ? "text-white" : "text-[#0052cc]"
-        }`}
-      >
-        Uhired
-      </span>
-    </div>
+    <BrandLogo
+      href="/"
+      variant={onDark ? "white" : "black"}
+      markSize={32}
+      title="Uhired"
+      withAiSuffix={false}
+      wordmarkClassName={onDark ? "text-xl font-bold tracking-tight text-white" : "text-xl font-bold tracking-tight text-[#0052cc]"}
+    />
   );
 }
 

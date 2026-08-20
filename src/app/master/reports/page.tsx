@@ -4,25 +4,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2,
-  CalendarRange,
   Download,
   FileJson,
   GraduationCap,
-  LifeBuoy,
   RefreshCw,
   ScrollText,
   Search,
-  TicketPercent,
   TrendingUp,
   X,
 } from "lucide-react";
 import { MasterShell } from "@/components/master-shell";
 import {
   MasterAlert,
-  MasterCard,
-  MasterHero,
-  MasterInfoCard,
-  MasterKpiCard,
   MasterSelect,
   masterBtnGhost,
   masterBtnPrimary,
@@ -100,67 +93,39 @@ const PERIOD_OPTIONS: Array<{ value: ReportPeriod; label: string }> = [
   { value: "all", label: "All time" },
 ];
 
-const SECTION_ACCENTS: Record<string, string> = {
-  "Company overview": "bg-primary/12 text-primary ring-primary/25",
-  "Practice performance": "bg-violet/12 text-violet ring-violet/25",
-  "Session activity": "bg-cyan/12 text-cyan ring-cyan/25",
-  "Support inbox": "bg-success/12 text-success ring-success/25",
-  "Promo codes": "bg-indigo-500/15 text-indigo-700 ring-indigo-500/25 dark:text-indigo-300",
-};
-
-const REPORT_SECTIONS = [
-  {
-    icon: Building2,
-    title: "Company overview",
-    description: "Total companies, active companies, interviews per company, and admin contact emails.",
-  },
-  {
-    icon: GraduationCap,
-    title: "Practice performance",
-    description: "Practice interview volume, revenue, paying users, promo redemptions, and top interview topics.",
-  },
-  {
-    icon: ScrollText,
-    title: "Session activity",
-    description: "Company vs practice split, completion rate, live interviews, and weekly trend chart.",
-  },
-  {
-    icon: LifeBuoy,
-    title: "Support inbox",
-    description: "Support inquiries received in the period — who contacted you and current status.",
-  },
-  {
-    icon: TicketPercent,
-    title: "Promo codes",
-    description: "Active promo codes and how many practice sessions used a promo bypass.",
-  },
-] as const;
-
 const inrFormatter = new Intl.NumberFormat("en-IN", {
   style: "currency",
   currency: "INR",
   maximumFractionDigits: 0,
 });
 
+function formatTrack(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\banaytics\b/gi, "analytics")
+    .replace(/\bdevloper\b/gi, "developer")
+    .split(" ")
+    .map((word) => {
+      const core = word.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, "");
+      if (!core) return word;
+      const lower = core.toLowerCase();
+      const formatted =
+        lower === "hr" || lower === "qa" || lower === "it" || lower === "ai"
+          ? lower.toUpperCase()
+          : lower.charAt(0).toUpperCase() + lower.slice(1);
+      return word.replace(core, formatted);
+    })
+    .join(" ");
+}
+
 type SessionTrendPeriod = "date" | "week" | "month" | "year";
 
-const SESSION_TREND_LABELS: Record<SessionTrendPeriod, { title: string; subtitle: string }> = {
-  date: {
-    title: "Session trend (daily)",
-    subtitle: "Interview sessions per day — last 7 days.",
-  },
-  week: {
-    title: "Session trend (weekly)",
-    subtitle: "Interview sessions per week — last 4 weeks.",
-  },
-  month: {
-    title: "Session trend (monthly view)",
-    subtitle: "Interview sessions per day — last 30 days.",
-  },
-  year: {
-    title: "Session trend (yearly)",
-    subtitle: "Interview sessions per month — last 12 months.",
-  },
+const SESSION_TREND_LABELS: Record<SessionTrendPeriod, string> = {
+  date: "Sessions (7 days)",
+  week: "Sessions (4 weeks)",
+  month: "Sessions (30 days)",
+  year: "Sessions (12 months)",
 };
 
 function startOfDay(date: Date) {
@@ -266,7 +231,7 @@ function reportToCsv(report: PlatformReport) {
   push(["Support inquiries", String(report.summary.supportInquiries)]);
   push([]);
   push(["Top interview topics", "Interviews"]);
-  for (const row of report.topDomains) push([row.domain, String(row.sessions)]);
+  for (const row of report.topDomains) push([formatTrack(row.domain), String(row.sessions)]);
   push([]);
   push(["Companies", "Domain", "Admin email", "Active", "Sessions"]);
   for (const company of report.companies) {
@@ -309,7 +274,7 @@ export default function MasterReportsPage() {
         return;
       }
       if (!res.ok) {
-        setError(payload.error ?? "Unable to generate report.");
+        setError(payload.error ?? "Could not generate report.");
         return;
       }
       setReport(payload);
@@ -359,9 +324,6 @@ export default function MasterReportsPage() {
     );
   }, [report?.companies, appliedCompanySearch]);
 
-  const appliedPeriodLabel =
-    PERIOD_OPTIONS.find((option) => option.value === appliedPeriod)?.label ?? appliedPeriod;
-
   const sessionTrendChart = useMemo(
     () => buildSessionTrendChart(report?.sessionTrendTimestamps ?? [], sessionTrendPeriod),
     [report?.sessionTrendTimestamps, sessionTrendPeriod],
@@ -369,7 +331,7 @@ export default function MasterReportsPage() {
 
   const maxTrend = Math.max(1, ...sessionTrendChart.map((item) => item.count));
 
-  const sessionTrendMeta = SESSION_TREND_LABELS[sessionTrendPeriod];
+  const sessionTrendTitle = SESSION_TREND_LABELS[sessionTrendPeriod];
 
   function downloadJson() {
     if (!report) return;
@@ -384,344 +346,261 @@ export default function MasterReportsPage() {
   }
 
   return (
-    <MasterShell
-      title="Platform Reports"
-      subtitle="Generate and download a full snapshot of companies, sessions, revenue, and support."
-      topActions={
-        <button
-          type="button"
-          onClick={() => void load(appliedPeriod)}
-          disabled={loading}
-          className={`${masterBtnGhost} inline-flex items-center gap-2 !px-4 !py-2.5 disabled:opacity-60`}
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
-          Refresh
-        </button>
-      }
-    >
-      <div className="space-y-5">
+    <MasterShell title="Reports" subtitle="Pick a date range, then download.">
+      <div className="space-y-3">
         {error ? <MasterAlert variant="error">{error}</MasterAlert> : null}
 
-        <MasterHero
-          badge="Platform reports"
-          title="Platform snapshot & exports"
-          subtitle="Build a single view of companies, sessions, revenue, promo usage, and support — then download JSON or CSV."
-        />
+        <section className="admin-card p-3">
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="min-w-[10rem] space-y-1">
+              <span className="admin-label">Period</span>
+              <MasterSelect
+                value={periodInput}
+                onValueChange={(value) => setPeriodInput(value as ReportPeriod)}
+                className="w-full min-w-[10rem]"
+                aria-label="Report period"
+                options={PERIOD_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={generateReport}
+              disabled={loading}
+              className={`${masterBtnPrimary} !px-4 disabled:opacity-60`}
+            >
+              {loading ? "Loading…" : "Update"}
+            </button>
+            <button
+              type="button"
+              onClick={downloadCsv}
+              disabled={!report || loading}
+              className={`${masterBtnGhost} inline-flex items-center gap-1.5 disabled:opacity-60`}
+            >
+              <Download className="h-4 w-4" />
+              CSV
+            </button>
+            <button
+              type="button"
+              onClick={downloadJson}
+              disabled={!report || loading}
+              className={`${masterBtnGhost} inline-flex items-center gap-1.5 disabled:opacity-60`}
+            >
+              <FileJson className="h-4 w-4" />
+              JSON
+            </button>
+            <button
+              type="button"
+              onClick={() => void load(appliedPeriod)}
+              disabled={loading}
+              className={`${masterBtnGhost} inline-flex h-10 items-center justify-center !px-3 disabled:opacity-60`}
+              aria-label="Refresh"
+              title="Refresh"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+        </section>
 
-        <MasterInfoCard title="What is Generate Report?">
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Select a time period, generate a fresh snapshot of the entire Uhired platform, and share
-            JSON or CSV with your team. The report includes company overview, practice performance,
-            session activity, support inbox, and promo code usage for the selected period.
-          </p>
-        </MasterInfoCard>
-
-        <MasterCard
-          elevated
-          title="Generate report"
-          subtitle="Choose a time period and build a fresh platform snapshot."
-        >
-          <div className="rounded-xl border border-border bg-surface/40 p-4 sm:p-5">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-              <label className="block space-y-1.5">
-                <span className="admin-label">Report period</span>
-                <div className="relative max-w-md">
-                  <CalendarRange
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <MasterSelect
-                    value={periodInput}
-                    onValueChange={(value) => setPeriodInput(value as ReportPeriod)}
-                    className="w-full pl-10"
-                    aria-label="Report period"
-                    options={PERIOD_OPTIONS.map((option) => ({
-                      value: option.value,
-                      label: option.label,
-                    }))}
-                  />
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  Currently showing: <span className="font-semibold text-foreground">{appliedPeriodLabel}</span>
-                </span>
-              </label>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={generateReport}
-                  disabled={loading}
-                  className={`${masterBtnPrimary} inline-flex items-center gap-2 !px-5 disabled:opacity-60`}
-                >
-                  <TrendingUp className="h-4 w-4" aria-hidden="true" />
-                  {loading ? "Generating..." : "Generate report"}
-                </button>
-                <button
-                  type="button"
-                  onClick={downloadJson}
-                  disabled={!report || loading}
-                  className={`${masterBtnGhost} inline-flex items-center gap-2 !px-4 disabled:opacity-60`}
-                >
-                  <FileJson className="h-4 w-4" aria-hidden="true" />
-                  Download JSON
-                </button>
-                <button
-                  type="button"
-                  onClick={downloadCsv}
-                  disabled={!report || loading}
-                  className={`${masterBtnGhost} inline-flex items-center gap-2 !px-4 disabled:opacity-60`}
-                >
-                  <Download className="h-4 w-4" aria-hidden="true" />
-                  Download CSV
-                </button>
-              </div>
+        {loading && !report ? (
+          <div className="space-y-2">
+            <div className="grid gap-2 sm:grid-cols-4">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="h-16 animate-pulse rounded-lg bg-muted" />
+              ))}
             </div>
           </div>
-        </MasterCard>
-
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {REPORT_SECTIONS.map((section) => {
-            const Icon = section.icon;
-            return (
-              <MasterInfoCard key={section.title}>
-                <div className="flex gap-3">
-                  <span
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ${
-                      SECTION_ACCENTS[section.title] ?? "bg-primary/12 text-primary ring-primary/25"
-                    }`}
-                  >
-                    <Icon className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <div>
-                    <p className="font-extrabold text-foreground">{section.title}</p>
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{section.description}</p>
-                  </div>
-                </div>
-              </MasterInfoCard>
-            );
-          })}
-        </section>
+        ) : null}
 
         {report ? (
           <>
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <MasterKpiCard
-                label="Companies"
-                value={report.summary.totalCompanies}
-                icon={Building2}
-                accent="bg-primary/12 text-primary ring-primary/25"
-              />
-              <MasterKpiCard
-                label="Total sessions"
-                value={report.summary.totalSessions}
-                icon={ScrollText}
-                accent="bg-violet/12 text-violet ring-violet/25"
-              />
-              <MasterKpiCard
-                label="Practice revenue"
-                value={inrFormatter.format(report.summary.practiceRevenue)}
-                icon={GraduationCap}
-                accent="bg-success/12 text-success ring-success/25"
-              />
-              <MasterKpiCard
-                label="Completion rate"
-                value={`${report.summary.completionRatePct}%`}
-                icon={TrendingUp}
-                accent="bg-warning/12 text-warning ring-warning/25"
-              />
+            <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <article className="admin-card flex items-center gap-3 p-3">
+                <div className="flex size-9 items-center justify-center rounded-lg bg-primary/12 text-primary">
+                  <Building2 className="size-4" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Companies</p>
+                  <p className="text-lg font-semibold text-foreground">{report.summary.totalCompanies}</p>
+                </div>
+              </article>
+              <article className="admin-card flex items-center gap-3 p-3">
+                <div className="flex size-9 items-center justify-center rounded-lg bg-violet/12 text-violet">
+                  <ScrollText className="size-4" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Sessions</p>
+                  <p className="text-lg font-semibold text-foreground">{report.summary.totalSessions}</p>
+                </div>
+              </article>
+              <article className="admin-card flex items-center gap-3 p-3">
+                <div className="flex size-9 items-center justify-center rounded-lg bg-success/12 text-success">
+                  <GraduationCap className="size-4" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Revenue</p>
+                  <p className="text-lg font-semibold text-foreground">
+                    {inrFormatter.format(report.summary.practiceRevenue)}
+                  </p>
+                </div>
+              </article>
+              <article className="admin-card flex items-center gap-3 p-3">
+                <div className="flex size-9 items-center justify-center rounded-lg bg-warning/12 text-warning">
+                  <TrendingUp className="size-4" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Completed</p>
+                  <p className="text-lg font-semibold text-foreground">{report.summary.completionRatePct}%</p>
+                </div>
+              </article>
             </section>
 
-            <div className="grid gap-5 lg:grid-cols-2">
-              <MasterCard
-                title={sessionTrendMeta.title}
-                subtitle={sessionTrendMeta.subtitle}
-                headerAction={
-                  <div className="flex rounded-lg border border-border bg-surface/40 p-1">
+            <div className="grid gap-3 lg:grid-cols-5">
+              <section className="admin-card p-4 lg:col-span-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-foreground">{sessionTrendTitle}</p>
+                  <div className="flex rounded-lg bg-muted/70 p-0.5 ring-1 ring-border">
                     {(["date", "week", "month", "year"] as const).map((period) => (
                       <button
                         key={period}
                         type="button"
                         onClick={() => setSessionTrendPeriod(period)}
-                        className={`rounded-md px-2.5 py-1.5 text-xs font-semibold capitalize transition sm:px-3 ${
+                        className={`rounded-md px-2.5 py-1 text-xs font-semibold capitalize ${
                           sessionTrendPeriod === period
-                            ? "text-primary-foreground shadow-sm"
+                            ? "bg-card text-foreground shadow-sm"
                             : "text-muted-foreground hover:text-foreground"
                         }`}
-                        style={
-                          sessionTrendPeriod === period
-                            ? { background: "var(--gradient-brand)" }
-                            : undefined
-                        }
                       >
-                        {period}
+                        {period === "date" ? "Day" : period}
                       </button>
                     ))}
                   </div>
-                }
-              >
-                <div
-                  className={`flex h-48 items-end gap-1.5 rounded-xl border border-border bg-surface/30 p-3 ${
-                    sessionTrendPeriod === "month" ? "overflow-x-auto pb-1" : ""
-                  }`}
-                >
+                </div>
+                <div className={`flex h-40 items-end gap-1.5 ${sessionTrendPeriod === "month" ? "overflow-x-auto pb-1" : ""}`}>
                   {sessionTrendChart.map((point, index) => {
-                    const isPeak = point.count === maxTrend && point.count > 0;
+                    const heightPct = Math.max(8, (point.count / maxTrend) * 100);
                     return (
                       <div
                         key={`${point.label}-${index}`}
-                        className={`flex flex-col items-center gap-2 ${
-                          sessionTrendPeriod === "month" ? "min-w-[1.35rem] flex-none" : "flex-1"
+                        className={`flex flex-col items-center gap-1.5 ${
+                          sessionTrendPeriod === "month" ? "min-w-[1.3rem] flex-none" : "min-w-0 flex-1"
                         }`}
                       >
-                        <p className="text-xs font-semibold text-foreground">{point.count}</p>
-                        <div
-                          className={`w-full rounded-t-md shadow-sm ${
-                            isPeak
-                              ? "bg-gradient-to-t from-emerald-500 to-success ring-2 ring-success/40"
-                              : "bg-gradient-to-t from-primary/60 to-primary"
-                          }`}
-                          style={{ height: `${Math.max(12, (point.count / maxTrend) * 140)}px` }}
-                        />
-                        <p
-                          className={`font-semibold uppercase text-muted-foreground ${
-                            sessionTrendPeriod === "month" ? "text-[9px]" : "text-[10px]"
-                          }`}
-                        >
+                        <p className="text-[10px] font-semibold text-foreground">{point.count}</p>
+                        <div className="flex h-24 w-full items-end justify-center rounded-md bg-muted/60 px-0.5">
+                          <div
+                            className="w-full max-w-[1.75rem] rounded-t-md"
+                            style={{
+                              height: `${heightPct}%`,
+                              background: point.count > 0 ? "var(--gradient-brand)" : "transparent",
+                            }}
+                            title={`${point.label}: ${point.count}`}
+                          />
+                        </div>
+                        <p className={`text-muted-foreground ${sessionTrendPeriod === "month" ? "text-[8px]" : "text-[10px]"}`}>
                           {point.label}
                         </p>
                       </div>
                     );
                   })}
                 </div>
-              </MasterCard>
+              </section>
 
-              <MasterCard title="Report summary" subtitle="Key metrics for this snapshot.">
+              <section className="admin-card p-4 lg:col-span-2">
+                <p className="mb-3 text-sm font-semibold text-foreground">Snapshot</p>
                 <div className="space-y-2 text-sm">
                   {[
                     ["Period", report.meta.periodLabel],
-                    ["Generated", new Date(report.meta.generatedAt).toLocaleString()],
-                    ["Practice sessions", report.summary.practiceSessions],
-                    ["Company sessions", report.summary.companySessions],
-                    ["Live now", report.summary.liveSessions],
-                    ["Paying users", report.summary.uniquePayingUsers],
-                    ["Promo redemptions", report.summary.promoRedemptions],
-                    ["Support inquiries", report.summary.supportInquiries],
-                    ["New support tickets", report.summary.supportNew],
+                    ["Practice", report.summary.practiceSessions],
+                    ["Company", report.summary.companySessions],
+                    ["Live", report.summary.liveSessions],
+                    ["Paying", report.summary.uniquePayingUsers],
+                    ["Promos used", report.summary.promoRedemptions],
+                    ["Support", report.summary.supportInquiries],
                   ].map(([label, value]) => (
-                    <div
-                      key={label}
-                      className="flex items-center justify-between rounded-lg border border-border bg-surface/40 px-3 py-2.5"
-                    >
+                    <div key={String(label)} className="flex items-center justify-between">
                       <span className="text-muted-foreground">{label}</span>
-                      <span className="font-bold text-foreground">{value}</span>
+                      <span className="font-semibold text-foreground">{value}</span>
                     </div>
                   ))}
                 </div>
-              </MasterCard>
+              </section>
             </div>
 
-            <MasterCard title="Top interview domains">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                {report.topDomains.map((track) => (
-                  <article
-                    key={track.domain}
-                    className="glow-card rounded-xl border border-border bg-surface/40 p-4"
-                  >
-                    <p className="text-sm font-semibold text-foreground">{track.domain}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{track.sessions} sessions</p>
-                  </article>
-                ))}
-              </div>
-            </MasterCard>
-
-            <MasterCard
-              elevated
-              title="Companies in report"
-              subtitle="Search companies included in this report snapshot."
-            >
-              <div className="mb-5 rounded-xl border border-border bg-surface/40 p-4 sm:p-5">
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-                  <label className="block space-y-1.5">
-                    <span className="admin-label">Search companies</span>
-                    <div className="relative">
-                      <Search
-                        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                      <input
-                        value={companySearchInput}
-                        onChange={(event) => setCompanySearchInput(event.target.value)}
-                        onKeyDown={handleCompanySearchKeyDown}
-                        placeholder="Company name, domain, admin email..."
-                        className={`${masterInputClass} w-full pl-10`}
-                      />
-                    </div>
-                  </label>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={applyCompanySearch}
-                      className={`${masterBtnPrimary} inline-flex items-center gap-2 !px-5`}
+            <section className="admin-card p-4">
+              <p className="mb-3 text-sm font-semibold text-foreground">Top tracks</p>
+              {report.topDomains.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {report.topDomains.map((track) => (
+                    <span
+                      key={track.domain}
+                      className="rounded-md border border-border bg-surface/50 px-2.5 py-1 text-xs text-foreground"
                     >
-                      <Search className="h-4 w-4" aria-hidden="true" />
-                      Search
-                    </button>
-                    {appliedCompanySearch ? (
-                      <button
-                        type="button"
-                        onClick={clearCompanySearch}
-                        className={`${masterBtnGhost} inline-flex items-center gap-2 !px-4`}
-                      >
-                        <X className="h-4 w-4" aria-hidden="true" />
-                        Clear
-                      </button>
-                    ) : null}
-                  </div>
+                      {formatTrack(track.domain)}{" "}
+                      <span className="text-muted-foreground">
+                        {track.sessions} {track.sessions === 1 ? "session" : "sessions"}
+                      </span>
+                    </span>
+                  ))}
                 </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No tracks yet.</p>
+              )}
+            </section>
 
+            <section className="admin-card overflow-hidden">
+              <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
+                <div className="relative min-w-[12rem] flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={companySearchInput}
+                    onChange={(event) => setCompanySearchInput(event.target.value)}
+                    onKeyDown={handleCompanySearchKeyDown}
+                    placeholder="Company, domain, or email"
+                    className={`${masterInputClass} w-full pl-10`}
+                    aria-label="Search companies"
+                  />
+                </div>
+                <button type="button" onClick={applyCompanySearch} className={`${masterBtnPrimary} !px-4`}>
+                  Search
+                </button>
                 {appliedCompanySearch ? (
-                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
-                    <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                      Active filters
-                    </span>
-                    <span className="rounded-full bg-surface/80 px-2.5 py-1 text-xs font-medium text-foreground ring-1 ring-border">
-                      Search: {appliedCompanySearch}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {filteredCompanies.length} of {report.companies.length} companies
-                    </span>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={clearCompanySearch}
+                    className={`${masterBtnGhost} inline-flex h-10 items-center !px-3`}
+                    aria-label="Clear search"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 ) : null}
               </div>
-
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm">
+                <table className="w-full min-w-[680px] text-left text-sm">
                   <thead>
                     <tr className={masterTableHeadClass}>
-                      <th className="py-3 pr-4">Company</th>
+                      <th className="px-3 py-2">Company</th>
                       <th className="pr-4">Domain</th>
                       <th className="pr-4">Admin</th>
                       <th className="pr-4">Sessions</th>
-                      <th className="pr-4">Status</th>
+                      <th className="pr-3">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredCompanies.map((company) => (
-                      <tr
-                        key={company.name}
-                        className="border-b border-border transition hover:bg-surface/40"
-                      >
-                        <td className="py-3 pr-4 font-semibold text-foreground">{company.name}</td>
+                      <tr key={company.name} className="border-b border-border last:border-0 hover:bg-muted/40">
+                        <td className="px-3 py-2.5 font-semibold text-foreground">{company.name}</td>
                         <td className="pr-4 text-muted-foreground">{company.domain}</td>
                         <td className="pr-4 text-muted-foreground">{company.adminEmail}</td>
                         <td className="pr-4 font-medium text-foreground">{company.totalSessions}</td>
-                        <td className="pr-4">
+                        <td className="pr-3">
                           <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ring-1 ${
                               company.isActive
                                 ? "bg-success/12 text-success ring-success/25"
-                                : "bg-surface/80 text-muted-foreground ring-border"
+                                : "bg-muted text-muted-foreground ring-border"
                             }`}
                           >
                             {company.isActive ? "Active" : "Inactive"}
@@ -732,38 +611,11 @@ export default function MasterReportsPage() {
                   </tbody>
                 </table>
               </div>
-
               {!filteredCompanies.length ? (
-                <div className="mt-4 rounded-2xl border border-dashed border-border bg-surface/30 px-4 py-10 text-center">
-                  <p className="text-sm font-semibold text-foreground">No companies match your search</p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Try a different company name, domain, or admin email.
-                  </p>
-                  {appliedCompanySearch ? (
-                    <button
-                      type="button"
-                      onClick={clearCompanySearch}
-                      className={`${masterBtnGhost} mt-4 inline-flex items-center gap-2`}
-                    >
-                      <X className="h-4 w-4" aria-hidden />
-                      Clear search
-                    </button>
-                  ) : null}
-                </div>
+                <p className="px-4 py-8 text-center text-sm text-muted-foreground">No companies found.</p>
               ) : null}
-            </MasterCard>
+            </section>
           </>
-        ) : null}
-
-        {loading && !report ? (
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-4">
-              {[1, 2, 3, 4].map((n) => (
-                <div key={n} className="h-24 animate-pulse rounded-2xl bg-surface/60" />
-              ))}
-            </div>
-            <p className="text-sm text-muted-foreground">Generating platform report…</p>
-          </div>
         ) : null}
       </div>
     </MasterShell>

@@ -7,23 +7,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
-
-  BarChart3,
-
+  Activity,
   Building2,
-
+  CheckCircle2,
   GraduationCap,
-
   Mail,
-
   RefreshCw,
-
-  UserCheck,
-
-  UserPlus,
-
+  Repeat,
+  Search,
+  Shield,
   Users,
-
 } from "lucide-react";
 
 import { MasterShell } from "@/components/master-shell";
@@ -41,14 +34,6 @@ import {
 import {
 
   MasterAlert,
-
-  MasterCard,
-
-  MasterHero,
-
-  MasterInfoCard,
-
-  MasterKpiCard,
 
   MasterSelect,
 
@@ -166,17 +151,18 @@ type AnalyticsResponse = {
 
 
 
+const USER_TYPE_ORDER: UserType[] = ["PRACTICE", "COMPANY_CANDIDATE", "INVITED", "COMPANY_ADMIN"];
+
 const USER_TYPE_LABELS: Record<UserType, string> = {
-
-  PRACTICE: "Practice user",
-
-  COMPANY_CANDIDATE: "Company candidate",
-
+  PRACTICE: "Practice",
+  COMPANY_CANDIDATE: "Company",
   INVITED: "Invited",
-
-  COMPANY_ADMIN: "Company admin",
-
+  COMPANY_ADMIN: "Admin",
 };
+
+function orderedUserTypes(types: UserType[]) {
+  return USER_TYPE_ORDER.filter((type) => types.includes(type));
+}
 
 
 
@@ -187,53 +173,17 @@ const USER_TYPE_STYLES: Record<UserType, string> = {
   COMPANY_ADMIN: "bg-success/12 text-success ring-1 ring-success/25",
 };
 
-/** Vibrant bar colors — visible on light and dark admin backgrounds */
-const NEW_USER_BAR_COLORS = [
-  "#06b6d4",
-  "#3b82f6",
-  "#8b5cf6",
-  "#10b981",
-  "#f59e0b",
-  "#ec4899",
-  "#6366f1",
-  "#14b8a6",
-  "#a855f7",
-  "#0ea5e9",
-  "#22c55e",
-  "#f97316",
-];
-
-
-
 type NewUsersPeriod = "week" | "month" | "year";
 
 
 
-const NEW_USERS_PERIOD_LABELS: Record<NewUsersPeriod, { title: string; subtitle: string }> = {
+const NEW_USERS_PERIOD_LABELS: Record<NewUsersPeriod, string> = {
 
-  week: {
+  week: "New users (7 days)",
 
-    title: "New users (last 7 days)",
+  month: "New users (30 days)",
 
-    subtitle: "First-time appearance by email — daily breakdown.",
-
-  },
-
-  month: {
-
-    title: "New users (last 30 days)",
-
-    subtitle: "First-time appearance by email — daily breakdown.",
-
-  },
-
-  year: {
-
-    title: "New users (last 12 months)",
-
-    subtitle: "First-time appearance by email — monthly breakdown.",
-
-  },
+  year: "New users (12 months)",
 
 };
 
@@ -377,59 +327,24 @@ function buildNewUsersChart(
 
 
 
-const WHAT_IT_TRACKS = [
-
-  {
-
-    icon: GraduationCap,
-
-    title: "Practice users",
-
-    description:
-
-      "Anyone who booked or completed a self-serve AI practice interview on /practice. Identified by candidate email on practice sessions.",
-
-  },
-
-  {
-
-    icon: Building2,
-
-    title: "Company candidates",
-
-    description:
-
-      "People invited by a company for a hiring interview, or listed in a company candidate roster. Includes completed and in-progress company sessions.",
-
-  },
-
-  {
-
-    icon: Mail,
-
-    title: "Invited (not yet interviewed)",
-
-    description:
-
-      "Emails that received a requirement invite link but may not have started an interview yet. Useful for measuring invite-to-join conversion.",
-
-  },
-
-  {
-
-    icon: UserCheck,
-
-    title: "Company admins",
-
-    description:
-
-      "Login emails for company portals (/company-login). One admin email per onboarded company.",
-
-  },
-
-] as const;
-
-
+function formatTrack(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\bdevloper\b/gi, "developer")
+    .split(" ")
+    .map((word) => {
+      const core = word.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, "");
+      if (!core) return word;
+      const lower = core.toLowerCase();
+      const formatted =
+        lower === "hr" || lower === "qa" || lower === "it" || lower === "ai"
+          ? lower.toUpperCase()
+          : lower.charAt(0).toUpperCase() + lower.slice(1);
+      return word.replace(core, formatted);
+    })
+    .join(" ");
+}
 
 function formatRelativeDate(value: string) {
 
@@ -446,7 +361,13 @@ function formatRelativeDate(value: string) {
   if (diffDays < 30) return `${diffDays}d ago`;
 
   return date.toLocaleDateString();
+}
 
+function initials(name: string, email: string) {
+  const source = name.trim() || email;
+  const parts = source.split(/[\s@._-]+/).filter(Boolean);
+  const letters = (parts[0]?.[0] ?? "U") + (parts[1]?.[0] ?? "");
+  return letters.toUpperCase();
 }
 
 
@@ -507,7 +428,7 @@ export default function MasterUserAnalyticsPage() {
 
       if (!res.ok) {
 
-        setError(payload.error ?? "Unable to load user analytics.");
+        setError(payload.error ?? "Could not load users.");
 
         return;
 
@@ -553,674 +474,332 @@ export default function MasterUserAnalyticsPage() {
 
 
 
-  const summaryCards = [
-
-    { label: "Total unique users", value: data?.summary.totalUniqueUsers ?? 0, icon: Users },
-
-    { label: "Active (30 days)", value: data?.summary.activeLast30Days ?? 0, icon: UserPlus },
-
-    { label: "Returning users", value: data?.summary.returningUsers ?? 0, icon: UserCheck },
-
-    { label: "Completion rate", value: `${data?.summary.completionRatePct ?? 0}%`, icon: BarChart3 },
-
+  const overviewCards = [
+    { label: "Users", value: data?.summary.totalUniqueUsers ?? 0, icon: Users, accent: "bg-primary/12 text-primary" },
+    { label: "Active", value: data?.summary.activeLast30Days ?? 0, icon: Activity, accent: "bg-success/12 text-success" },
+    {
+      label: "Repeat users",
+      hint: "2+ interviews",
+      value: data?.summary.returningUsers ?? 0,
+      icon: Repeat,
+      accent: "bg-violet/12 text-violet",
+    },
+    {
+      label: "Completed",
+      value: `${data?.summary.completionRatePct ?? 0}%`,
+      icon: CheckCircle2,
+      accent: "bg-warning/12 text-warning",
+    },
   ];
-
-
 
   const audienceCards = [
-
-    { label: "Practice users", value: data?.summary.practiceUsers ?? 0, icon: GraduationCap },
-
-    { label: "Company candidates", value: data?.summary.companyCandidates ?? 0, icon: Building2 },
-
-    { label: "Invited emails", value: data?.summary.invitedUsers ?? 0, icon: Mail },
-
-    { label: "Company admins", value: data?.summary.companyAdmins ?? 0, icon: UserCheck },
-
+    { label: "Practice", value: data?.summary.practiceUsers ?? 0, icon: GraduationCap, accent: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300" },
+    { label: "Company", value: data?.summary.companyCandidates ?? 0, icon: Building2, accent: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300" },
+    { label: "Invited", value: data?.summary.invitedUsers ?? 0, icon: Mail, accent: "bg-amber-500/15 text-amber-800 dark:text-amber-300" },
+    { label: "Admins", value: data?.summary.companyAdmins ?? 0, icon: Shield, accent: "bg-success/12 text-success" },
   ];
 
+  const overlapRows = [
+    { label: "Practice only", value: data?.userTypeBreakdown.practiceOnly ?? 0, bar: "bg-cyan-500" },
+    { label: "Company only", value: data?.userTypeBreakdown.companyOnly ?? 0, bar: "bg-indigo-500" },
+    { label: "Both", value: data?.userTypeBreakdown.bothPracticeAndCompany ?? 0, bar: "bg-violet-500" },
+    { label: "Admins only", value: data?.userTypeBreakdown.adminsOnly ?? 0, bar: "bg-emerald-500" },
+  ];
+  const overlapMax = Math.max(1, ...overlapRows.map((row) => row.value));
 
+  const topTracks = data?.topDomains ?? [];
+  const trackMax = Math.max(1, ...topTracks.map((track) => track.users));
 
   const newUsersChart = useMemo(
-
     () => buildNewUsersChart(data?.users ?? [], newUsersPeriod),
-
     [data?.users, newUsersPeriod],
-
   );
-
-
-
   const maxNewUsersCount = Math.max(1, ...newUsersChart.map((item) => item.count));
 
-
-
-  const newUsersPeriodMeta = NEW_USERS_PERIOD_LABELS[newUsersPeriod];
-
-
-
   return (
-
-    <MasterShell
-
-      title="User Analytics"
-
-      subtitle="Understand who uses Uhired — practice candidates, company hires, invites, and admins."
-
-      topActions={
-
-        <button
-
-          type="button"
-
-          onClick={() => void load()}
-
-          disabled={loading}
-
-          className={`${masterBtnGhost} inline-flex items-center gap-2 !px-4 !py-2.5 disabled:opacity-60`}
-
-        >
-
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
-
-          Refresh
-
-        </button>
-
-      }
-
-    >
-
-      <div className="space-y-5">
-
+    <MasterShell title="User analytics" subtitle="People using Uhired.">
+      <div className="space-y-4">
         {error ? <MasterAlert variant="error">{error}</MasterAlert> : null}
 
-
-
-        <MasterHero
-
-          badge="Platform users"
-
-          title="User analytics"
-
-          subtitle="A platform-wide view of people interacting with Uhired across practice, hiring, and admin flows."
-
-        />
-
-
-
-        <MasterInfoCard title="What is User Analytics?">
-
-          <p className="text-sm leading-relaxed text-muted-foreground">
-
-            This page gives you a <strong className="font-semibold text-foreground">platform-wide view of people</strong>{" "}
-
-            interacting with Uhired — not company-by-company, but across the entire ecosystem. Users are grouped by
-
-            email from practice bookings, company interview sessions, invite lists, and admin accounts. Use it to see
-
-            growth, engagement, popular tracks, and who is returning for more sessions.
-
-          </p>
-
-        </MasterInfoCard>
-
-
-
-        <div className="grid gap-5 xl:grid-cols-2">
-
-          <MasterCard title="Who gets counted?" subtitle="Four audience types tracked on this dashboard.">
-
-            <ul className="space-y-3">
-
-              {WHAT_IT_TRACKS.map((item) => {
-
-                const Icon = item.icon;
-
-                return (
-
-                  <li key={item.title} className="flex gap-3 rounded-xl border border-border bg-muted/70 p-3">
-
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
-
-                      <Icon className="h-4 w-4" aria-hidden="true" />
-
-                    </span>
-
-                    <div>
-
-                      <p className="text-sm font-semibold text-foreground">{item.title}</p>
-
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
-
-                    </div>
-
-                  </li>
-
-                );
-
-              })}
-
-            </ul>
-
-          </MasterCard>
-
-
-
-          <MasterCard title="Key metrics explained">
-
-            <ul className="space-y-3 text-sm leading-relaxed text-muted-foreground">
-
-              <li>
-
-                <strong className="font-semibold text-foreground">Total unique users</strong> — distinct emails across all
-
-                sources. One person can appear in multiple categories.
-
-              </li>
-
-              <li>
-
-                <strong className="font-semibold text-foreground">Active (30 days)</strong> — users with any session or
-
-                invite activity in the last month.
-
-              </li>
-
-              <li>
-
-                <strong className="font-semibold text-foreground">Returning users</strong> — people with 2 or more interview
-
-                sessions (practice or company).
-
-              </li>
-
-              <li>
-
-                <strong className="font-semibold text-foreground">Completion rate</strong> — share of all sessions that
-
-                reached COMPLETED status.
-
-              </li>
-
-              <li>
-
-                <strong className="font-semibold text-foreground">Top tracks</strong> — most popular interview domains by
-
-                session volume.
-
-              </li>
-
-            </ul>
-
-
-
-            <div className="mt-5 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-200">
-
-              <strong className="font-semibold">Note:</strong> Uhired does not have a single “user account” table yet. Analytics
-
-              are derived from session emails, company admin logins, and invite records — the same data your platform already
-
-              collects during bookings and hiring flows.
-
-            </div>
-
-          </MasterCard>
-
-        </div>
-
-
-
-        <div className="grid gap-3 md:grid-cols-4">
-
-          {summaryCards.map((card) => (
-
-            <MasterKpiCard
-
-              key={card.label}
-
-              label={card.label}
-
-              value={card.value}
-
-              icon={card.icon}
-
-              accent="bg-primary/12 text-primary"
-
-            />
-
-          ))}
-
-        </div>
-
-
-
-        <div className="grid gap-3 md:grid-cols-4">
-
-          {audienceCards.map((card) => (
-
-            <MasterKpiCard
-
-              key={card.label}
-
-              label={card.label}
-
-              value={card.value}
-
-              icon={card.icon}
-
-              accent="bg-primary/12 text-primary"
-
-            />
-
-          ))}
-
-        </div>
-
-
-
-        <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-
-          <MasterCard
-
-            title={newUsersPeriodMeta.title}
-
-            subtitle={newUsersPeriodMeta.subtitle}
-
-            headerAction={
-              <div className="flex rounded-lg border border-border bg-surface/50 p-1">
+        <section>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Overview</p>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {overviewCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <article key={card.label} className="admin-card flex items-center gap-3 p-3.5">
+                  <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${card.accent}`}>
+                    <Icon className="size-4" aria-hidden />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">{card.label}</p>
+                    <p className="text-lg font-semibold tracking-tight text-foreground">{card.value}</p>
+                    {"hint" in card && card.hint ? (
+                      <p className="text-[10px] text-muted-foreground">{card.hint}</p>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <section>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Audience</p>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {audienceCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <article key={card.label} className="admin-card flex items-center gap-3 p-3.5">
+                  <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${card.accent}`}>
+                    <Icon className="size-4" aria-hidden />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">{card.label}</p>
+                    <p className="text-lg font-semibold tracking-tight text-foreground">{card.value}</p>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <div className="grid gap-3 lg:grid-cols-5">
+          <section className="admin-card p-4 lg:col-span-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-foreground">{NEW_USERS_PERIOD_LABELS[newUsersPeriod]}</p>
+                <p className="text-xs text-muted-foreground">First time we saw each email</p>
+              </div>
+              <div className="flex rounded-lg bg-muted/70 p-0.5 ring-1 ring-border">
                 {(["week", "month", "year"] as const).map((period) => (
                   <button
                     key={period}
                     type="button"
                     onClick={() => setNewUsersPeriod(period)}
-                    className={`rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition ${
+                    className={`rounded-md px-2.5 py-1 text-xs font-semibold capitalize ${
                       newUsersPeriod === period
-                        ? "text-primary-foreground shadow-[var(--shadow-glow)]"
+                        ? "bg-card text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
-                    style={
-                      newUsersPeriod === period ? { background: "var(--gradient-brand)" } : undefined
-                    }
                   >
                     {period}
                   </button>
                 ))}
               </div>
-            }
-          >
-            <div
-              className={`flex h-56 items-end gap-2 rounded-xl border border-border bg-surface/25 p-4 ${
-                newUsersPeriod === "month" ? "overflow-x-auto" : ""
-              }`}
-            >
+            </div>
+            <div className={`flex h-44 items-end gap-1.5 ${newUsersPeriod === "month" ? "overflow-x-auto pb-1" : ""}`}>
               {newUsersChart.map((point, index) => {
-                const barColor =
-                  point.count > 0
-                    ? NEW_USER_BAR_COLORS[index % NEW_USER_BAR_COLORS.length]
-                    : "color-mix(in oklab, var(--foreground) 12%, transparent)";
-                const isPeak = point.count === maxNewUsersCount && point.count > 0;
+                const heightPct = Math.max(8, (point.count / maxNewUsersCount) * 100);
                 return (
                   <div
                     key={`${point.label}-${index}`}
-                    className={`group flex flex-col items-center gap-2 ${
-                      newUsersPeriod === "month" ? "min-w-[1.35rem] flex-none" : "flex-1"
+                    className={`flex flex-col items-center gap-1.5 ${
+                      newUsersPeriod === "month" ? "min-w-[1.4rem] flex-none" : "min-w-0 flex-1"
                     }`}
                   >
-                    <p className="text-xs font-bold text-foreground">{point.count}</p>
-                    <div
-                      className={`w-full min-w-[0.5rem] max-w-[2.5rem] rounded-t-lg transition-all duration-300 group-hover:opacity-90 ${
-                        isPeak ? "ring-2 ring-white/40 shadow-lg" : ""
-                      }`}
-                      style={{
-                        height: `${Math.max(point.count > 0 ? 20 : 6, (point.count / maxNewUsersCount) * 148)}px`,
-                        background: barColor,
-                        boxShadow: point.count > 0 ? `0 4px 14px ${barColor}55` : undefined,
-                      }}
-                      title={`${point.label}: ${point.count} new users`}
-                    />
-                    <p
-                      className={`font-semibold text-muted-foreground ${
-                        newUsersPeriod === "month" ? "text-[9px]" : "text-[10px]"
-                      }`}
-                    >
+                    <p className="text-[10px] font-semibold text-foreground">{point.count}</p>
+                    <div className="flex h-28 w-full items-end justify-center rounded-md bg-muted/60 px-0.5">
+                      <div
+                        className="w-full max-w-[1.75rem] rounded-t-md"
+                        style={{
+                          height: `${heightPct}%`,
+                          background: point.count > 0 ? "var(--gradient-brand)" : "transparent",
+                        }}
+                        title={`${point.label}: ${point.count}`}
+                      />
+                    </div>
+                    <p className={`text-muted-foreground ${newUsersPeriod === "month" ? "text-[8px]" : "text-[10px]"}`}>
                       {point.label}
                     </p>
                   </div>
                 );
               })}
             </div>
+          </section>
 
-          </MasterCard>
-
-
-
-          <MasterCard title="Audience overlap" subtitle="How user types relate to each other.">
-
-            <div className="space-y-3 text-sm">
-
-              <div className="flex items-center justify-between rounded-lg border border-border bg-surface/40 px-3 py-2">
-
-                <span className="text-muted-foreground">Practice only</span>
-
-                <span className="font-bold text-foreground">{data?.userTypeBreakdown.practiceOnly ?? 0}</span>
-
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border border-border bg-surface/40 px-3 py-2">
-
-                <span className="text-muted-foreground">Company candidate only</span>
-
-                <span className="font-bold text-foreground">{data?.userTypeBreakdown.companyOnly ?? 0}</span>
-
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border border-border bg-surface/40 px-3 py-2">
-
-                <span className="text-muted-foreground">Both practice & company</span>
-
-                <span className="font-bold text-foreground">{data?.userTypeBreakdown.bothPracticeAndCompany ?? 0}</span>
-
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border border-border bg-surface/40 px-3 py-2">
-
-                <span className="text-muted-foreground">Admins only</span>
-
-                <span className="font-bold text-foreground">{data?.userTypeBreakdown.adminsOnly ?? 0}</span>
-
-              </div>
-
+          <section className="admin-card flex flex-col p-4 lg:col-span-2">
+            <p className="text-sm font-semibold text-foreground">Mix</p>
+            <p className="mb-3 text-xs text-muted-foreground">Where people sit in the product</p>
+            <div className="space-y-3">
+              {overlapRows.map((row) => (
+                <div key={row.label}>
+                  <div className="mb-1 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{row.label}</span>
+                    <span className="font-semibold text-foreground">{row.value}</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full ${row.bar}`}
+                      style={{ width: `${Math.max(row.value > 0 ? 4 : 0, (row.value / overlapMax) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
-
-
-
-            <div className="mt-5 border-t border-border pt-4">
-
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Session split</p>
-
-              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-
-                <div className="rounded-lg bg-cyan-500/15 px-3 py-2 text-cyan-800 ring-1 ring-cyan-500/25 dark:text-cyan-200">
-
-                  Practice: <strong>{data?.sessionBreakdown.practice ?? 0}</strong>
-
-                </div>
-
-                <div className="rounded-lg bg-indigo-500/15 px-3 py-2 text-indigo-800 ring-1 ring-indigo-500/25 dark:text-indigo-200">
-
-                  Company: <strong>{data?.sessionBreakdown.company ?? 0}</strong>
-
-                </div>
-
-                <div className="rounded-lg bg-success/12 px-3 py-2 text-success ring-1 ring-success/25">
-
-                  Completed: <strong>{data?.sessionBreakdown.completed ?? 0}</strong>
-
-                </div>
-
-                <div className="rounded-lg bg-amber-500/15 px-3 py-2 text-amber-900 ring-1 ring-amber-500/25 dark:text-amber-200">
-
-                  Live now: <strong>{data?.sessionBreakdown.live ?? 0}</strong>
-
-                </div>
-
+            <div className="mt-auto grid grid-cols-2 gap-2 pt-4">
+              <div className="rounded-lg bg-cyan-500/12 px-3 py-2 text-xs font-semibold text-cyan-800 ring-1 ring-cyan-500/20 dark:text-cyan-200">
+                Practice {data?.sessionBreakdown.practice ?? 0}
               </div>
-
+              <div className="rounded-lg bg-indigo-500/12 px-3 py-2 text-xs font-semibold text-indigo-800 ring-1 ring-indigo-500/20 dark:text-indigo-200">
+                Company {data?.sessionBreakdown.company ?? 0}
+              </div>
+              <div className="rounded-lg bg-success/12 px-3 py-2 text-xs font-semibold text-success ring-1 ring-success/20">
+                Done {data?.sessionBreakdown.completed ?? 0}
+              </div>
+              <div className="rounded-lg bg-amber-500/12 px-3 py-2 text-xs font-semibold text-amber-900 ring-1 ring-amber-500/20 dark:text-amber-200">
+                Live {data?.sessionBreakdown.live ?? 0}
+              </div>
             </div>
-
-          </MasterCard>
-
+          </section>
         </div>
 
-
-
-        <MasterCard
-
-          title="Top interview tracks"
-
-          subtitle="Domains with the highest user and session volume."
-
-        >
-
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-
-            {(data?.topDomains ?? []).map((track) => (
-
-              <article key={track.domain} className="rounded-xl border border-border bg-muted/70 p-4">
-
-                <p className="text-sm font-semibold text-foreground">{track.domain}</p>
-
-                <p className="mt-2 text-xs text-muted-foreground">{track.users} users · {track.sessions} sessions</p>
-
-              </article>
-
-            ))}
-
-            {!data?.topDomains?.length ? (
-
-              <p className="text-sm text-muted-foreground">No interview data yet.</p>
-
-            ) : null}
-
-          </div>
-
-        </MasterCard>
-
-
-
-        <MasterCard
-
-          title="User directory"
-
-          subtitle="Search and filter all known emails. Sorted by most recent activity."
-
-          headerAction={
-
-            <div className="flex flex-wrap gap-2">
-
-              <input
-
-                value={search}
-
-                onChange={(event) => setSearch(event.target.value)}
-
-                placeholder="Search name, email, track..."
-
-                className={masterInputClass}
-
-              />
-
-              <MasterSelect
-
-                value={typeFilter}
-
-                onValueChange={(value) => setTypeFilter(value as "ALL" | UserType)}
-
-                className="min-w-[12rem]"
-
-                aria-label="Filter by user type"
-
-                options={[
-
-                  { value: "ALL", label: "All types" },
-
-                  { value: "PRACTICE", label: "Practice users" },
-
-                  { value: "COMPANY_CANDIDATE", label: "Company candidates" },
-
-                  { value: "INVITED", label: "Invited" },
-
-                  { value: "COMPANY_ADMIN", label: "Company admins" },
-
-                ]}
-
-              />
-
+        <section className="admin-card p-4">
+          <p className="text-sm font-semibold text-foreground">Top tracks</p>
+          <p className="mb-3 text-xs text-muted-foreground">Most common interview topics</p>
+          {topTracks.length ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {topTracks.slice(0, 8).map((track, index) => (
+                <div key={track.domain} className="min-w-0">
+                  <div className="mb-1 flex items-baseline justify-between gap-2">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      <span className="mr-1.5 text-xs text-muted-foreground">{index + 1}.</span>
+                      {formatTrack(track.domain)}
+                    </p>
+                    <p className="shrink-0 text-xs text-muted-foreground">
+                      {track.users} · {track.sessions} sessions
+                    </p>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.max(8, (track.users / trackMax) * 100)}%`,
+                        background: "var(--gradient-brand)",
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No tracks yet.</p>
+          )}
+        </section>
 
-          }
-
-        >
+        <section className="admin-card overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-border px-4 py-2.5">
+            <div className="min-w-0 shrink-0">
+              <p className="text-sm font-semibold text-foreground">People</p>
+              <p className="text-xs text-muted-foreground">{data?.pagination.total ?? 0} users</p>
+            </div>
+            <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+              <div className="relative min-w-0 max-w-xs flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Name, email, or track"
+                  className={`${masterInputClass} !h-8 !min-h-8 w-full !py-1.5 pl-9 !text-xs`}
+                  aria-label="Search users"
+                />
+              </div>
+              <MasterSelect
+                value={typeFilter}
+                onValueChange={(value) => setTypeFilter(value as "ALL" | UserType)}
+                size="sm"
+                className="w-[8.75rem] shrink-0"
+                aria-label="Filter by user type"
+                options={[
+                  { value: "ALL", label: "All types" },
+                  { value: "PRACTICE", label: "Practice" },
+                  { value: "COMPANY_CANDIDATE", label: "Company" },
+                  { value: "INVITED", label: "Invited" },
+                  { value: "COMPANY_ADMIN", label: "Admins" },
+                ]}
+              />
+              <button
+                type="button"
+                onClick={() => void load()}
+                disabled={loading}
+                className={`${masterBtnGhost} inline-flex h-8 w-8 shrink-0 items-center justify-center !px-0 disabled:opacity-60`}
+                aria-label="Refresh"
+                title="Refresh"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+          </div>
 
           <div className="overflow-x-auto">
-
-            <table className="w-full min-w-[960px] text-left text-sm">
-
+            <table className="w-full min-w-[900px] text-left text-sm">
               <thead>
-
                 <tr className={masterTableHeadClass}>
-
-                  <th className="py-3 pr-4">User</th>
-
-                  <th className="pr-4">Types</th>
-
+                  <th className="px-4 py-2.5">User</th>
+                  <th className="pr-4">Type</th>
                   <th className="pr-4">Sessions</th>
-
-                  <th className="pr-4">Avg score</th>
-
-                  <th className="pr-4">Primary track</th>
-
+                  <th className="pr-4">Score</th>
+                  <th className="pr-4">Track</th>
                   <th className="pr-4">Last active</th>
-
                   <th className="pr-4">First seen</th>
-
                 </tr>
-
               </thead>
-
               <tbody>
-
                 {(data?.users ?? []).map((user) => (
-
-                  <tr key={user.email} className="border-b border-border transition hover:bg-surface/40">
-
-                    <td className="py-4 pr-4">
-
-                      <p className="font-semibold text-foreground">{user.name}</p>
-
-                      <p className="text-xs text-muted-foreground">{user.email}</p>
-
-                      {user.companies.length ? (
-
-                        <p className="mt-1 text-xs text-muted-foreground">{user.companies.join(", ")}</p>
-
-                      ) : null}
-
-                    </td>
-
-                    <td className="pr-4">
-
-                      <div className="flex flex-wrap gap-1">
-
-                        {user.types.map((type) => (
-
-                          <span
-
-                            key={type}
-
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${USER_TYPE_STYLES[type]}`}
-
-                          >
-
-                            {USER_TYPE_LABELS[type]}
-
-                          </span>
-
-                        ))}
-
+                  <tr key={user.email} className="border-b border-border last:border-0 hover:bg-muted/40">
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-3">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[11px] font-bold text-primary">
+                          {initials(user.name, user.email)}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-foreground">{user.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+                        </div>
                       </div>
-
                     </td>
-
                     <td className="pr-4">
-
-                      <p className="font-medium text-foreground">{user.sessionCount}</p>
-
-                      <p className="text-xs text-muted-foreground">
-
-                        {user.completedCount} completed
-
-                        {user.isReturning ? " · returning" : ""}
-
-                      </p>
-
+                      <div className="flex flex-wrap items-center justify-start gap-1">
+                        {orderedUserTypes(user.types).map((type) => (
+                          <span
+                            key={type}
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${USER_TYPE_STYLES[type]}`}
+                          >
+                            {USER_TYPE_LABELS[type]}
+                          </span>
+                        ))}
+                      </div>
                     </td>
-
+                    <td className="pr-4 font-medium text-foreground">{user.sessionCount}</td>
                     <td className="pr-4 text-foreground">{user.avgScore ?? "—"}</td>
-
-                    <td className="pr-4 text-foreground/90">{user.primaryTrack}</td>
-
-                    <td className="pr-4 text-muted-foreground">{formatRelativeDate(user.lastActiveAt)}</td>
-
-                    <td className="pr-4 text-muted-foreground">{formatRelativeDate(user.firstSeenAt)}</td>
-
+                    <td className="pr-4 text-foreground">{formatTrack(user.primaryTrack)}</td>
+                    <td className="pr-4 text-xs text-muted-foreground">{formatRelativeDate(user.lastActiveAt)}</td>
+                    <td className="pr-4 text-xs text-muted-foreground">{formatRelativeDate(user.firstSeenAt)}</td>
                   </tr>
-
                 ))}
-
               </tbody>
-
             </table>
-
+            {!loading && !(data?.pagination.total ?? 0) ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">No users found.</p>
+            ) : null}
+            {loading && !(data?.users.length ?? 0) ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
+            ) : null}
           </div>
 
-
-
           <MasterPagination
-
             page={page}
-
             pageSize={pageSize}
-
             totalItems={data?.pagination.total ?? 0}
-
             itemLabel="users"
-
             onPageChange={setPage}
-
             onPageSizeChange={(size) => {
-
               setPageSize(size);
-
               setPage(1);
-
             }}
-
           />
-
-
-
-          {!loading && !(data?.pagination.total ?? 0) ? (
-
-            <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/50 px-4 py-8 text-center">
-
-              <p className="text-sm font-semibold text-foreground">No users match your filters</p>
-
-              <p className="mt-2 text-sm text-muted-foreground">
-
-                Users appear here after someone books a practice session, gets invited by a company, or a company admin is
-
-                onboarded.
-
-              </p>
-
-            </div>
-
-          ) : null}
-
-
-
-          {loading ? <p className="mt-4 text-sm text-muted-foreground">Loading user analytics…</p> : null}
-
-        </MasterCard>
-
+        </section>
       </div>
-
     </MasterShell>
-
   );
-
 }
-
-

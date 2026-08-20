@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, Building2, Clock, Loader2, Mail, User } from "lucide-react";
-import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 import { FormEvent, useEffect, useState } from "react";
 
 type ApplyPreview = {
@@ -86,10 +86,12 @@ export function ApplyPageClient({ code }: { code: string }) {
     >
       <header className="relative z-20 border-b border-[#1d3557]/8 bg-white/70 backdrop-blur-xl">
         <nav className="mx-auto flex h-16 max-w-3xl items-center justify-between px-5">
-          <Link href="/" className="font-display text-lg font-extrabold tracking-tight no-underline">
-            <span className="text-[#0f172a]">Uhired</span>
-            <span className="text-gradient"> AI</span>
-          </Link>
+          <BrandLogo
+            variant="black"
+            markSize={32}
+            wordmarkClassName="text-lg font-extrabold text-[#0f172a]"
+            priority
+          />
           {preview?.companyName ? (
             <span className="max-w-[50%] truncate text-sm font-semibold text-[#334155]">
               {preview.companyName}

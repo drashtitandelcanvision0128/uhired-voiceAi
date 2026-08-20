@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { AppFeedbackProvider } from "@/components/app-feedback";
 import { ThemeProvider } from "@/components/theme-provider";
 import { PwaRegister } from "@/components/pwa-register";
@@ -12,6 +13,13 @@ export const metadata: Metadata = {
   },
   description:
     "Practice mock interviews with an AI interview coach for PM, engineering, data science, and more. Uhired helps candidates build confidence and companies run structured AI interviews.",
+  icons: {
+    icon: [
+      { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/favicon-48.png", sizes: "48x48", type: "image/png" },
+    ],
+    apple: "/brand/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -33,10 +41,14 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="Uhired" />
-        <link rel="apple-touch-icon" href="/marketing/hero-features-grid.png" />
-        <script dangerouslySetInnerHTML={{ __html: getThemeInitScript() }} />
+        <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+        <link rel="icon" href="/brand/favicon-32.png" type="image/png" sizes="32x32" />
+        <link rel="icon" href="/brand/favicon-16.png" type="image/png" sizes="16x16" />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <Script id="uhired-theme" strategy="beforeInteractive">
+          {getThemeInitScript()}
+        </Script>
         <ThemeProvider>
           <AppFeedbackProvider>
             <PwaRegister />

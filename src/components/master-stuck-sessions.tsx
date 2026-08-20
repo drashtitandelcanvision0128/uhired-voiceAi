@@ -20,12 +20,7 @@ import {
 import { useAppFeedback } from "@/components/app-feedback";
 import {
   MasterAlert,
-  MasterCard,
-  MasterHero,
-  MasterInlineKpi,
-  MasterKpiCard,
   MasterStatusBadge,
-  MasterSelect,
   masterBtnGhost,
   masterBtnPrimary,
   masterInputClass,
@@ -203,7 +198,7 @@ export function MasterStuckSessionsPanel({
       const payload = (await res.json()) as StuckResponse & { error?: string };
 
       if (!res.ok) {
-        setError(payload.error ?? "Unable to load stuck sessions.");
+        setError(payload.error ?? "Could not load stuck interviews.");
         return;
       }
 
@@ -268,11 +263,11 @@ export function MasterStuckSessionsPanel({
       });
       const payload = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !payload.ok) {
-        setError(payload.error ?? "Unable to update session.");
+        setError(payload.error ?? "Could not update.");
         return;
       }
       await load();
-      notify.success(action === "complete" ? "Session marked as complete." : "Session reset to ready.");
+      notify.success(action === "complete" ? "Marked complete." : "Reset to ready.");
     } finally {
       setUpdatingId(null);
     }
@@ -291,7 +286,7 @@ export function MasterStuckSessionsPanel({
       const res = await fetch(`/api/master/sessions/${sessionId}`, { method: "DELETE" });
       const payload = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !payload.ok) {
-        setError(payload.error ?? "Unable to delete session.");
+        setError(payload.error ?? "Could not delete.");
         return;
       }
       setSelectedSessionIds((current) => {
@@ -330,7 +325,7 @@ export function MasterStuckSessionsPanel({
       });
       const payload = (await res.json()) as { ok?: boolean; error?: string; deletedCount?: number };
       if (!res.ok || !payload.ok) {
-        setError(payload.error ?? "Unable to delete selected sessions.");
+        setError(payload.error ?? "Could not delete selected.");
         return;
       }
       setSelectedSessionIds(new Set());
@@ -353,7 +348,7 @@ export function MasterStuckSessionsPanel({
   const sessionList = (
     <>
       {!compact && (data?.sessions.length ?? 0) > 0 ? (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface/40 px-4 py-3">
+        <div className="mb-3 flex flex-wrap items-center gap-3 px-1">
           <label className="flex items-center gap-2 text-xs font-semibold text-foreground">
             <input
               type="checkbox"
@@ -379,7 +374,7 @@ export function MasterStuckSessionsPanel({
         </div>
       ) : null}
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {(data?.sessions ?? []).map((session) => {
           const rowBusy = updatingId === session.id || deleteLoadingId === session.id;
           const isCritical = session.ageHours >= 24;
@@ -387,7 +382,7 @@ export function MasterStuckSessionsPanel({
           return (
             <article
               key={session.id}
-              className={`glow-card rounded-2xl border px-4 py-4 transition-all sm:px-5 ${
+              className={`rounded-xl border px-3 py-2.5 transition sm:px-4 ${
                 isCritical
                   ? "border-warning/35 bg-warning/5 ring-1 ring-warning/20"
                   : "border-border bg-surface/30"
@@ -436,12 +431,12 @@ export function MasterStuckSessionsPanel({
                     label={session.name}
                     actions={[
                       {
-                        label: "Force complete",
+                        label: "Complete",
                         onClick: () => void updateSession(session.id, "complete"),
                         disabled: rowBusy,
                       },
                       {
-                        label: "Reset to ready",
+                        label: "Reset",
                         onClick: () => void updateSession(session.id, "reset_to_ready"),
                         disabled: rowBusy,
                       },
@@ -460,15 +455,10 @@ export function MasterStuckSessionsPanel({
         })}
 
         {!loading && !data?.sessions.length ? (
-          <div className="rounded-2xl border border-dashed border-border bg-surface/30 px-6 py-12 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-success/12 text-success ring-1 ring-success/25">
-              <Activity className="h-6 w-6" aria-hidden />
-            </div>
-            <p className="mt-4 text-base font-bold text-foreground">No stuck interviews found</p>
+          <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
+            <p className="text-sm font-semibold text-foreground">No stuck interviews</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {hasActiveFilters
-                ? "Try changing your filters, or clear them to see all stuck interviews."
-                : "All interviews are moving normally — nothing needs attention right now."}
+              {hasActiveFilters ? "Try different filters." : "Nothing needs attention."}
             </p>
             {hasActiveFilters ? (
               <button
@@ -508,7 +498,7 @@ export function MasterStuckSessionsPanel({
           <div>
             <p className="admin-section-title text-sm">Stuck interviews</p>
             <p className="text-[11px] text-muted-foreground">
-              {data?.liveCount ?? 0} live · {data?.stuckCount ?? 0} older than 1 hour
+              {data?.liveCount ?? 0} live · {data?.stuckCount ?? 0} stuck
             </p>
           </div>
           <div className="flex items-center gap-1.5">
@@ -526,9 +516,9 @@ export function MasterStuckSessionsPanel({
               onClick={() => void load()}
               disabled={loading}
               className={`${masterBtnGhost} inline-flex items-center gap-1.5 !px-2.5 !py-1 !text-xs disabled:opacity-60`}
+              aria-label="Refresh"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-              Refresh
             </button>
           </div>
         </div>
@@ -577,12 +567,12 @@ export function MasterStuckSessionsPanel({
                     label={session.name}
                     actions={[
                       {
-                        label: "Force complete",
+                        label: "Complete",
                         onClick: () => void updateSession(session.id, "complete"),
                         disabled: rowBusy,
                       },
                       {
-                        label: "Reset to ready",
+                        label: "Reset",
                         onClick: () => void updateSession(session.id, "reset_to_ready"),
                         disabled: rowBusy,
                       },
@@ -600,7 +590,7 @@ export function MasterStuckSessionsPanel({
           </div>
         ) : (
           <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-sm text-muted-foreground">
-            No stuck interviews — everything is moving normally.
+            No stuck interviews.
           </p>
         )}
       </section>
@@ -608,75 +598,40 @@ export function MasterStuckSessionsPanel({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {error ? <MasterAlert variant="error">{error}</MasterAlert> : null}
 
-      <MasterHero
-        badge="Needs attention"
-        title="Stuck interviews"
-        subtitle="These interviews started or are waiting, but have not finished for more than 1 hour. You can review, complete, or remove them."
-        actions={
-          <button
-            type="button"
-            onClick={() => void load()}
-            disabled={loading}
-            className="admin-btn-ghost inline-flex items-center gap-2 px-4 py-2.5 text-sm disabled:opacity-60"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
-        }
-      >
-        <div className="grid gap-3 sm:grid-cols-3">
-          <MasterInlineKpi label="Live now" value={data?.liveCount ?? 0} />
-          <MasterInlineKpi label="Stuck (>1h)" value={data?.stuckCount ?? 0} />
-          <MasterInlineKpi
-            label="Oldest on page"
-            value={oldestOnPage > 0 ? formatAgeLabel(oldestOnPage) : "—"}
-          />
-        </div>
-      </MasterHero>
-
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MasterKpiCard
-          label="Live Interviews"
-          value={data?.liveCount ?? 0}
-          hint="Across the platform right now"
-          icon={Activity}
-          accent="bg-destructive/12 text-destructive ring-destructive/25"
-        />
-        <MasterKpiCard
-          label="Stuck Interviews"
-          value={data?.stuckCount ?? 0}
-          hint="LIVE or READY older than 1 hour"
-          icon={AlertTriangle}
-          accent="bg-warning/12 text-warning ring-warning/25"
-        />
-        <MasterKpiCard
-          label="On This Page"
-          value={data?.sessions.length ?? 0}
-          hint={`Page ${data?.pagination.page ?? 1} of ${data?.pagination.totalPages ?? 1}`}
-          icon={Clock}
-          accent="bg-primary/12 text-primary ring-primary/25"
-        />
-        <MasterKpiCard
-          label="Selected"
-          value={selectedSessionIds.size}
-          hint="Ready for bulk actions"
-          icon={Trash2}
-          accent="bg-violet/12 text-violet ring-violet/25"
-        />
+      <section className="grid gap-2 sm:grid-cols-3">
+        <article className="admin-card flex items-center justify-between gap-2 p-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Live</p>
+            <p className="text-xl font-semibold text-foreground">{data?.liveCount ?? 0}</p>
+          </div>
+          <Activity className="h-4 w-4 text-destructive" aria-hidden />
+        </article>
+        <article className="admin-card flex items-center justify-between gap-2 p-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Stuck</p>
+            <p className="text-xl font-semibold text-foreground">{data?.stuckCount ?? 0}</p>
+          </div>
+          <AlertTriangle className="h-4 w-4 text-warning" aria-hidden />
+        </article>
+        <article className="admin-card flex items-center justify-between gap-2 p-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Oldest</p>
+            <p className="text-xl font-semibold text-foreground">
+              {oldestOnPage > 0 ? formatAgeLabel(oldestOnPage) : "—"}
+            </p>
+          </div>
+          <Clock className="h-4 w-4 text-primary" aria-hidden />
+        </article>
       </section>
 
-      <MasterCard
-        elevated
-        title="Stuck interviews"
-        subtitle="Filter by candidate, status, interview type, company, age, or date range."
-      >
-        <div className="mb-5 rounded-xl border border-border bg-surface/40 p-4 sm:p-5">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:items-end">
-            <label className="block space-y-1.5">
-              <span className="admin-label">Search sessions</span>
+      <section className="admin-card overflow-hidden">
+        <div className="space-y-3 p-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4 xl:items-end">
+            <label className="block space-y-1">
+              <span className="admin-label">Search</span>
               <div className="relative">
                 <Search
                   className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
@@ -688,74 +643,24 @@ export function MasterStuckSessionsPanel({
                   onKeyDown={(event) => {
                     if (event.key === "Enter") applyFilters();
                   }}
-                  placeholder="Candidate name, email, company..."
+                  placeholder="Name or email"
                   className={`${masterInputClass} w-full pl-10`}
                 />
               </div>
             </label>
 
-            <label className="block space-y-1.5">
-              <span className="admin-label">Status</span>
-              <MasterSelect
-                value={statusInput}
-                onValueChange={(value) => setStatusInput(value as "" | "LIVE" | "READY")}
-                className="w-full"
-                aria-label="Filter by stuck status"
-                options={[
-                  { value: "", label: "All stuck statuses" },
-                  { value: "LIVE", label: "LIVE" },
-                  { value: "READY", label: "READY" },
-                ]}
-              />
-            </label>
-
-            <label className="block space-y-1.5">
-              <span className="admin-label">Session type</span>
-              <MasterSelect
-                value={typeInput}
-                onValueChange={(value) => setTypeInput(value as "" | "PRACTICE" | "COMPANY")}
-                className="w-full"
-                aria-label="Filter by session type"
-                options={[
-                  { value: "", label: "All types" },
-                  { value: "PRACTICE", label: "Practice" },
-                  { value: "COMPANY", label: "Company" },
-                ]}
-              />
-            </label>
-
-            <div className="flex items-end gap-2">
-              <button
-                type="button"
-                onClick={applyFilters}
-                className={`${masterBtnPrimary} inline-flex h-[2.75rem] flex-1 items-center justify-center gap-2 !px-4`}
-              >
-                <Search className="h-4 w-4" aria-hidden />
-                Search
-              </button>
-              {hasActiveFilters ? (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className={`${masterBtnGhost} inline-flex h-[2.75rem] items-center justify-center gap-2 !px-4`}
-                >
-                  <X className="h-4 w-4" aria-hidden />
-                  Clear
-                </button>
-              ) : null}
-            </div>
-
-            <label className="block space-y-1.5">
-              <span className="admin-label">Domain / track</span>
+            <label className="block space-y-1">
+              <span className="admin-label">Track</span>
               <input
                 value={domainInput}
                 onChange={(event) => setDomainInput(event.target.value)}
-                placeholder="e.g. Engineering"
+                placeholder="Engineering"
                 className={`${masterInputClass} w-full`}
               />
             </label>
-            <label className="block space-y-1.5">
-              <span className="admin-label">Min age (hours)</span>
+
+            <label className="block space-y-1">
+              <span className="admin-label">Stuck for (hours)</span>
               <input
                 type="number"
                 min={1}
@@ -765,40 +670,59 @@ export function MasterStuckSessionsPanel({
                 className={`${masterInputClass} w-full`}
               />
             </label>
-            <label className="block space-y-1.5">
-              <span className="admin-label">Max age (hours)</span>
+
+            <div className="flex items-end gap-2">
+              <button
+                type="button"
+                onClick={applyFilters}
+                className={`${masterBtnPrimary} inline-flex h-10 flex-1 items-center justify-center gap-2 !px-4`}
+              >
+                <Search className="h-4 w-4" aria-hidden />
+                Search
+              </button>
+              <button
+                type="button"
+                onClick={() => void load()}
+                disabled={loading}
+                className={`${masterBtnGhost} inline-flex h-10 items-center justify-center !px-3 disabled:opacity-60`}
+                aria-label="Refresh"
+                title="Refresh"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              </button>
+              {hasActiveFilters ? (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className={`${masterBtnGhost} inline-flex h-10 items-center justify-center !px-3`}
+                  aria-label="Clear filters"
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                </button>
+              ) : null}
+            </div>
+
+            <label className="block space-y-1">
+              <span className="admin-label">From</span>
               <input
-                type="number"
-                min={1}
-                value={maxAgeInput}
-                onChange={(event) => setMaxAgeInput(event.target.value)}
-                placeholder="Optional"
+                type="date"
+                value={fromDateInput}
+                onChange={(event) => setFromDateInput(event.target.value)}
                 className={`${masterInputClass} w-full`}
               />
             </label>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block min-w-0 space-y-1.5">
-                <span className="admin-label">From date</span>
-                <input
-                  type="date"
-                  value={fromDateInput}
-                  onChange={(event) => setFromDateInput(event.target.value)}
-                  className={`${masterInputClass} w-full`}
-                />
-              </label>
-              <label className="block min-w-0 space-y-1.5">
-                <span className="admin-label">To date</span>
-                <input
-                  type="date"
-                  value={toDateInput}
-                  onChange={(event) => setToDateInput(event.target.value)}
-                  className={`${masterInputClass} w-full`}
-                />
-              </label>
-            </div>
+            <label className="block space-y-1">
+              <span className="admin-label">To</span>
+              <input
+                type="date"
+                value={toDateInput}
+                onChange={(event) => setToDateInput(event.target.value)}
+                className={`${masterInputClass} w-full`}
+              />
+            </label>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {(["", "LIVE", "READY"] as const).map((status) => (
               <button
                 key={status || "all"}
@@ -808,16 +732,14 @@ export function MasterStuckSessionsPanel({
                   setAppliedStatus(status);
                   setPage(1);
                 }}
-                className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
                   appliedStatus === status
-                    ? "text-primary-foreground shadow-[var(--shadow-glow)]"
+                    ? "text-primary-foreground"
                     : "bg-surface/60 text-muted-foreground ring-1 ring-border hover:text-foreground"
                 }`}
-                style={
-                  appliedStatus === status ? { background: "var(--gradient-brand)" } : undefined
-                }
+                style={appliedStatus === status ? { background: "var(--gradient-brand)" } : undefined}
               >
-                {status === "" ? "All" : status}
+                {status === "" ? "All" : status === "LIVE" ? "Live" : "Ready"}
               </button>
             ))}
             {(["", "PRACTICE", "COMPANY"] as const).map((type) => (
@@ -829,79 +751,31 @@ export function MasterStuckSessionsPanel({
                   setAppliedType(type);
                   setPage(1);
                 }}
-                className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
                   appliedType === type
-                    ? "text-primary-foreground shadow-[var(--shadow-glow)]"
+                    ? "text-primary-foreground"
                     : "bg-surface/60 text-muted-foreground ring-1 ring-border hover:text-foreground"
                 }`}
-                style={
-                  appliedType === type ? { background: "var(--gradient-brand)" } : undefined
-                }
+                style={appliedType === type ? { background: "var(--gradient-brand)" } : undefined}
               >
                 {type === "" ? "All types" : sessionTypeLabel(type)}
               </button>
             ))}
           </div>
-
-          {hasActiveFilters ? (
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                Active filters
-              </span>
-              {appliedSearch ? (
-                <span className="rounded-full bg-primary/12 px-2.5 py-1 text-xs font-semibold text-primary ring-1 ring-primary/25">
-                  Search: {appliedSearch}
-                </span>
-              ) : null}
-              {appliedStatus ? (
-                <span className="rounded-full bg-primary/12 px-2.5 py-1 text-xs font-semibold text-primary ring-1 ring-primary/25">
-                  Status: {appliedStatus}
-                </span>
-              ) : null}
-              {appliedType ? (
-                <span className="rounded-full bg-primary/12 px-2.5 py-1 text-xs font-semibold text-primary ring-1 ring-primary/25">
-                  Type: {sessionTypeLabel(appliedType)}
-                </span>
-              ) : null}
-              {appliedDomain ? (
-                <span className="rounded-full bg-primary/12 px-2.5 py-1 text-xs font-semibold text-primary ring-1 ring-primary/25">
-                  Domain: {appliedDomain}
-                </span>
-              ) : null}
-              {appliedMinAge ? (
-                <span className="rounded-full bg-primary/12 px-2.5 py-1 text-xs font-semibold text-primary ring-1 ring-primary/25">
-                  Min age: {appliedMinAge}h
-                </span>
-              ) : null}
-              {appliedMaxAge ? (
-                <span className="rounded-full bg-primary/12 px-2.5 py-1 text-xs font-semibold text-primary ring-1 ring-primary/25">
-                  Max age: {appliedMaxAge}h
-                </span>
-              ) : null}
-              {appliedFromDate ? (
-                <span className="rounded-full bg-primary/12 px-2.5 py-1 text-xs font-semibold text-primary ring-1 ring-primary/25">
-                  From: {appliedFromDate}
-                </span>
-              ) : null}
-              {appliedToDate ? (
-                <span className="rounded-full bg-primary/12 px-2.5 py-1 text-xs font-semibold text-primary ring-1 ring-primary/25">
-                  To: {appliedToDate}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
         </div>
 
-        {loading && !data?.sessions.length ? (
-          <div className="space-y-3">
-            {[1, 2, 3, 4].map((n) => (
-              <div key={n} className="h-24 animate-pulse rounded-2xl bg-surface/60" />
-            ))}
-          </div>
-        ) : (
-          sessionList
-        )}
-      </MasterCard>
+        <div className="px-3 pb-3">
+          {loading && !data?.sessions.length ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="h-14 animate-pulse rounded-xl bg-surface/60" />
+              ))}
+            </div>
+          ) : (
+            sessionList
+          )}
+        </div>
+      </section>
     </div>
   );
 }

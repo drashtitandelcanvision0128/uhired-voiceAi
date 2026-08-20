@@ -17,6 +17,8 @@ import {
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Logo } from "@/components/marketing/site/Navbar";
+import { Orb } from "@/components/marketing/site/shared";
 
 type InvitePreview = {
   valid: boolean;
@@ -32,6 +34,9 @@ type InvitePreview = {
   emailHint?: string | null;
   error?: string | null;
 };
+
+const fieldClass =
+  "w-full rounded-xl border border-border bg-surface/60 px-4 py-3.5 text-sm text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground/70 focus:border-primary/60 focus:bg-surface focus:ring-4 focus:ring-primary/15";
 
 export default function CandidatePage() {
   const router = useRouter();
@@ -112,7 +117,7 @@ export default function CandidatePage() {
 
   return (
     <div
-      className="candidate-entry relative flex min-h-screen flex-col overflow-hidden text-[#0f172a]"
+      className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground"
       style={
         accent
           ? ({
@@ -121,26 +126,20 @@ export default function CandidatePage() {
           : undefined
       }
     >
-      <div className="pointer-events-none absolute inset-0" aria-hidden>
-        <div className="candidate-entry-mesh absolute inset-0" />
-        <div className="absolute -left-24 top-[-10%] h-[28rem] w-[28rem] rounded-full bg-[color-mix(in_oklab,var(--candidate-accent,#0e7490)_18%,transparent)] blur-3xl" />
-        <div className="absolute -right-20 bottom-[-5%] h-[26rem] w-[26rem] rounded-full bg-[color-mix(in_oklab,#1d3557_14%,transparent)] blur-3xl" />
-        <div className="candidate-entry-grid absolute inset-0 opacity-[0.35]" />
-      </div>
+      <Orb className="-top-32 -left-24 h-[420px] w-[420px] opacity-30" />
+      <Orb className="-bottom-40 -right-20 h-[380px] w-[380px] opacity-20" tone="violet" />
+      <div aria-hidden="true" className="neural-grid animate-grid-pan pointer-events-none absolute inset-0 opacity-50" />
 
-      <header className="relative z-20 border-b border-[#1d3557]/8 bg-white/70 backdrop-blur-xl">
+      <header className="relative z-20 border-b border-border bg-background/70 backdrop-blur-xl">
         <nav className="mx-auto flex h-[4.25rem] max-w-6xl items-center justify-between px-5 sm:px-8">
-          <Link href="/" className="font-display text-xl font-extrabold tracking-tight no-underline">
-            <span className="text-[#0f172a]">Uhired</span>
-            <span className="text-gradient"> AI</span>
-          </Link>
+          <Logo />
           {preview?.companyName ? (
-            <span className="max-w-[50%] truncate text-sm font-semibold text-[#334155]">
+            <span className="max-w-[50%] truncate text-sm font-semibold text-muted-foreground">
               {preview.companyName}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#1d3557]/10 bg-white/80 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#475569]">
-              <Lock className="h-3 w-3 text-[color:var(--candidate-accent,#0e7490)]" />
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/70 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+              <Lock className="h-3 w-3 text-primary" />
               Secure access
             </span>
           )}
@@ -149,54 +148,55 @@ export default function CandidatePage() {
 
       <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col px-5 py-10 sm:px-8 lg:py-14">
         <div className="grid flex-1 items-center gap-10 lg:grid-cols-12 lg:gap-14">
-          {/* Left copy */}
           <section className="animate-rise space-y-7 lg:col-span-6">
-            <span className="inline-flex items-center gap-2 rounded-full border border-[color-mix(in_oklab,var(--candidate-accent,#0e7490)_28%,transparent)] bg-[color-mix(in_oklab,var(--candidate-accent,#0e7490)_10%,white)] px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--candidate-accent,#0f766e)]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--candidate-accent,#0e7490)]" />
+            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-accent">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
               Interview room access
             </span>
 
             {preview?.roleTitle ? (
-              <div className="candidate-invite-card rounded-2xl border border-[#1d3557]/10 bg-white/85 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.06)] backdrop-blur-md sm:p-6">
+              <div className="glass glow-card rounded-2xl border border-border p-5 sm:p-6">
                 <div className="flex items-start gap-4">
                   {preview.logoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={preview.logoUrl}
                       alt=""
-                      className="h-12 w-12 rounded-xl object-contain ring-1 ring-[#1d3557]/10"
+                      className="h-12 w-12 rounded-xl object-contain ring-1 ring-border"
                     />
                   ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color-mix(in_oklab,var(--candidate-accent,#1d3557)_12%,white)] text-[#1d3557]">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-primary/40 bg-primary/12 text-primary">
                       <Building2 className="h-5 w-5" />
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#64748b]">
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                       Interview invitation
                     </p>
-                    <h2 className="font-display mt-1 text-xl font-extrabold tracking-tight text-[#0f172a] sm:text-2xl">
+                    <h2 className="font-display mt-1 text-xl font-extrabold tracking-tight sm:text-2xl">
                       {preview.roleTitle}
                     </h2>
                     {preview.companyName ? (
-                      <p className="mt-0.5 text-sm font-medium text-[#475569]">at {preview.companyName}</p>
+                      <p className="mt-0.5 text-sm font-medium text-muted-foreground">
+                        at {preview.companyName}
+                      </p>
                     ) : null}
-                    <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-[#475569]">
+                    <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
                       {preview.durationMin ? (
                         <span className="inline-flex items-center gap-1.5">
-                          <Clock className="h-3.5 w-3.5 text-[color:var(--candidate-accent,#0e7490)]" />
+                          <Clock className="h-3.5 w-3.5 text-primary" />
                           {preview.durationMin} min
                         </span>
                       ) : null}
                       {preview.emailHint ? (
                         <span className="inline-flex items-center gap-1.5">
-                          <Mail className="h-3.5 w-3.5 text-[color:var(--candidate-accent,#0e7490)]" />
+                          <Mail className="h-3.5 w-3.5 text-primary" />
                           {preview.emailHint}
                         </span>
                       ) : null}
                       {preview.scheduledAt ? (
                         <span className="inline-flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5 text-[color:var(--candidate-accent,#0e7490)]" />
+                          <Calendar className="h-3.5 w-3.5 text-primary" />
                           {new Date(preview.scheduledAt).toLocaleString("en-IN", {
                             dateStyle: "medium",
                             timeStyle: "short",
@@ -206,7 +206,7 @@ export default function CandidatePage() {
                         </span>
                       ) : preview.expiresAt ? (
                         <span className="inline-flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5 text-[color:var(--candidate-accent,#0e7490)]" />
+                          <Calendar className="h-3.5 w-3.5 text-primary" />
                           Until {new Date(preview.expiresAt).toLocaleDateString()}
                         </span>
                       ) : null}
@@ -217,11 +217,11 @@ export default function CandidatePage() {
             ) : null}
 
             <div>
-              <h1 className="font-display text-[2.6rem] font-extrabold leading-[1.05] tracking-tight text-[#0f172a] sm:text-5xl lg:text-[3.35rem]">
+              <h1 className="font-display text-[2.6rem] font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.35rem]">
                 Your next chapter
-                <span className="mt-1 block text-[color:var(--candidate-accent,#0e7490)]">starts here.</span>
+                <span className="text-gradient mt-1 block">starts here.</span>
               </h1>
-              <p className="mt-4 max-w-lg text-base leading-relaxed text-[#475569] sm:text-lg">
+              <p className="mt-4 max-w-lg text-base leading-relaxed text-muted-foreground sm:text-lg">
                 {preview?.valid
                   ? "Confirm your details to enter the interview room. Use the same email address that received the invite."
                   : preview?.scheduledAt
@@ -231,12 +231,12 @@ export default function CandidatePage() {
             </div>
 
             {previewLoading ? (
-              <p className="inline-flex items-center gap-2 text-sm font-medium text-[#64748b]">
+              <p className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading interview details…
               </p>
             ) : preview?.error && !preview.valid ? (
-              <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950">
+              <p className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm font-medium text-warning">
                 {preview.error}
               </p>
             ) : null}
@@ -249,9 +249,9 @@ export default function CandidatePage() {
               ].map(({ icon: Icon, label }) => (
                 <li
                   key={label}
-                  className="flex items-center gap-2.5 rounded-xl border border-[#1d3557]/8 bg-white/60 px-3 py-2.5 text-xs font-semibold text-[#334155] backdrop-blur-sm"
+                  className="glass flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold text-foreground"
                 >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0f172a]/5 text-[#1d3557]">
+                  <span className="inline-grid h-8 w-8 place-items-center rounded-lg border border-primary/40 bg-primary/12 text-primary">
                     <Icon className="h-3.5 w-3.5" />
                   </span>
                   {label}
@@ -260,29 +260,26 @@ export default function CandidatePage() {
             </ul>
           </section>
 
-          {/* Form */}
           <section className="animate-rise-right lg:col-span-6" style={{ animationDelay: "80ms" }}>
             <form
               onSubmit={handleSubmit}
-              className="candidate-entry-form relative overflow-hidden rounded-[1.35rem] border border-white/70 bg-white/90 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.1)] backdrop-blur-xl sm:p-8"
+              className="glass glow-card relative overflow-hidden rounded-[1.35rem] border border-border p-6 sm:p-8"
+              style={{ boxShadow: "var(--shadow-panel)" }}
             >
               <div
                 className="pointer-events-none absolute inset-x-0 top-0 h-1"
-                style={{
-                  background:
-                    "linear-gradient(90deg, color-mix(in oklab, var(--candidate-accent, #0e7490) 80%, #1d3557), #1d3557)",
-                }}
+                style={{ background: "var(--gradient-brand)" }}
               />
 
               <div className="space-y-2">
                 <label
                   htmlFor="accessCode"
-                  className="block font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#64748b]"
+                  className="block font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground"
                 >
                   Interview session code
                 </label>
                 <div className="relative">
-                  <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b8]" />
+                  <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
                     id="accessCode"
                     name="accessCode"
@@ -290,13 +287,13 @@ export default function CandidatePage() {
                     defaultValue={initialCode}
                     placeholder="Paste your invite code"
                     autoComplete="off"
-                    className="w-full rounded-xl border border-[#1d3557]/12 bg-[#f8fafc] py-3.5 pl-11 pr-4 font-mono text-sm font-semibold tracking-wide text-[#0f172a] outline-none transition placeholder:font-sans placeholder:font-medium placeholder:tracking-normal placeholder:text-[#94a3b8] focus:border-[color:var(--candidate-accent,#0e7490)] focus:bg-white focus:ring-4 focus:ring-[color-mix(in_oklab,var(--candidate-accent,#0e7490)_18%,transparent)]"
+                    className={`${fieldClass} pl-11 font-mono font-semibold tracking-wide`}
                   />
                 </div>
               </div>
 
               <div className="mt-7 space-y-3">
-                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#64748b]">
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                   Your details
                 </p>
                 <input
@@ -304,7 +301,7 @@ export default function CandidatePage() {
                   required
                   placeholder="Full name"
                   autoComplete="name"
-                  className="w-full rounded-xl border border-[#1d3557]/12 bg-[#f8fafc] px-4 py-3.5 text-sm font-medium text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[color:var(--candidate-accent,#0e7490)] focus:bg-white focus:ring-4 focus:ring-[color-mix(in_oklab,var(--candidate-accent,#0e7490)_18%,transparent)]"
+                  className={fieldClass}
                 />
                 <input
                   name="email"
@@ -312,12 +309,12 @@ export default function CandidatePage() {
                   required
                   placeholder="Email used for the invite"
                   autoComplete="email"
-                  className="w-full rounded-xl border border-[#1d3557]/12 bg-[#f8fafc] px-4 py-3.5 text-sm font-medium text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[color:var(--candidate-accent,#0e7490)] focus:bg-white focus:ring-4 focus:ring-[color-mix(in_oklab,var(--candidate-accent,#0e7490)_18%,transparent)]"
+                  className={fieldClass}
                 />
               </div>
 
               {error ? (
-                <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                <div className="mt-5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
                   {error}
                 </div>
               ) : null}
@@ -325,11 +322,7 @@ export default function CandidatePage() {
               <button
                 type="submit"
                 disabled={loading || preview?.valid === false}
-                className="group mt-6 flex w-full items-center justify-center gap-2.5 rounded-xl py-3.5 text-sm font-bold text-white shadow-[0_12px_28px_rgba(29,53,87,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(29,53,87,0.34)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
-                style={{
-                  background:
-                    "linear-gradient(105deg, color-mix(in oklab, var(--candidate-accent, #0e7490) 75%, #1d3557), #1d3557 70%)",
-                }}
+                className="group mt-6 flex w-full items-center justify-center gap-2.5 rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-[var(--shadow-glow)] transition hover:-translate-y-0.5 hover:opacity-95 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? (
                   <>
@@ -344,27 +337,27 @@ export default function CandidatePage() {
                 )}
               </button>
 
-              <div className="mt-5 flex items-start gap-3 rounded-xl border border-[color-mix(in_oklab,var(--candidate-accent,#0e7490)_18%,transparent)] bg-[color-mix(in_oklab,var(--candidate-accent,#0e7490)_8%,white)] px-4 py-3.5">
-                <Zap className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--candidate-accent,#0e7490)]" />
-                <p className="text-xs leading-relaxed text-[#334155]">
-                  <span className="font-bold text-[#0f172a]">Before you begin:</span> camera and microphone
-                  checks run inside the interview room.
+              <div className="mt-5 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/8 px-4 py-3.5">
+                <Zap className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  <span className="font-bold text-foreground">Before you begin:</span> camera and
+                  microphone checks run inside the interview room.
                 </p>
               </div>
             </form>
           </section>
         </div>
 
-        <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-[#1d3557]/8 pt-6 text-xs text-[#64748b]">
+        <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6 text-xs text-muted-foreground">
           <p>© {new Date().getFullYear()} Uhired. All rights reserved.</p>
           <div className="flex gap-4 font-semibold">
-            <Link href="/privacy" className="transition hover:text-[#0f172a]">
+            <Link href="/privacy" className="transition hover:text-foreground">
               Privacy
             </Link>
-            <Link href="/terms" className="transition hover:text-[#0f172a]">
+            <Link href="/terms" className="transition hover:text-foreground">
               Terms
             </Link>
-            <Link href="/contact" className="transition hover:text-[#0f172a]">
+            <Link href="/contact" className="transition hover:text-foreground">
               Support
             </Link>
           </div>

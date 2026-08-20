@@ -10,11 +10,8 @@ import {
   MasterPageSize,
   MasterPagination,
 } from "@/components/master-pagination";
-import { MasterPracticeSessionDetailModal } from "@/components/master-practice-session-detail-modal";
 import {
   MasterAlert,
-  MasterCard,
-  MasterHero,
   MasterKpiCard,
   MasterSelect,
   masterBtnGhost,
@@ -50,44 +47,23 @@ type PracticeResponse = {
   };
 };
 
+function formatStatus(status: string) {
+  return status
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatPayment(payment: "PAID" | "PROMO" | "UNPAID") {
+  if (payment === "PAID") return "Paid";
+  if (payment === "PROMO") return "Promo";
+  return "Unpaid";
+}
+
 const inrCurrencyFormatter = new Intl.NumberFormat("en-IN", {
   style: "currency",
   currency: "INR",
 });
-
-type PracticeSessionDetails = {
-  session: {
-    id: string;
-    candidateName: string | null;
-    candidateEmail: string | null;
-    status: string;
-    domain: string;
-    topic: string;
-    durationMin: number;
-    createdAt: string;
-    scoringJobStatus?: "PENDING" | "SUBMITTED" | "COMPLETED" | "FAILED" | null;
-    scorecard: {
-      overallScore: number;
-      communication: number;
-      domainDepth: number;
-      confidence: number;
-      summary: string;
-      strengths?: string[] | null;
-      improvements?: string[] | null;
-      evidence?: string[] | null;
-      scoringMode?: string | null;
-      scoringModel?: string | null;
-    } | null;
-    transcript: Array<{
-      id: string;
-      speaker: "CANDIDATE" | "INTERVIEWER";
-      message: string;
-      orderIndex: number;
-      timestampMs: number | null;
-      createdAt: string;
-    }>;
-  };
-};
 
 export default function MasterPracticeSessionsPage() {
   const router = useRouter();
@@ -96,8 +72,6 @@ export default function MasterPracticeSessionsPage() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<PracticeResponse | null>(null);
   const [error, setError] = useState("");
-  const [details, setDetails] = useState<PracticeSessionDetails["session"] | null>(null);
-  const [detailsLoadingId, setDetailsLoadingId] = useState<string | null>(null);
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<MasterPageSize>(MASTER_PAGE_SIZE_OPTIONS[0]);
@@ -182,7 +156,7 @@ export default function MasterPracticeSessionsPage() {
       return;
     }
     if (!res.ok) {
-      setError(payload.error ?? "Unable to load practice logs.");
+        setError(payload.error ?? "Could not load sessions.");
       return;
     }
     setData(payload);
@@ -200,50 +174,12 @@ export default function MasterPracticeSessionsPage() {
     appliedScoreMax,
   ]);
 
-  const viewDetails = useCallback(
-    async (sessionId: string) => {
-      setDetails(null);
-      setDetailsLoadingId(sessionId);
-      setError("");
-      try {
-        const res = await fetch(`/api/master/practice-sessions/${sessionId}`);
-        const payload = (await res.json()) as PracticeSessionDetails & { error?: string };
-        if (res.status === 401) {
-          router.push("/master-login");
-          return;
-        }
-        if (!res.ok) {
-          setError(payload.error ?? "Unable to load session details.");
-          return;
-        }
-        setDetails(payload.session);
-      } finally {
-        setDetailsLoadingId(null);
-      }
-    },
-    [router],
-  );
-
-  const closeDetails = useCallback(() => {
-    setDetails(null);
-    setDetailsLoadingId(null);
-    const params = new URLSearchParams(searchParams.toString());
-    if (params.has("sessionId")) {
-      params.delete("sessionId");
-      const query = params.toString();
-      router.replace(
-        query ? `/master/practice-sessions?${query}` : "/master/practice-sessions",
-        { scroll: false },
-      );
-    }
-  }, [router, searchParams]);
-
   useEffect(() => {
     const sessionId = searchParams.get("sessionId");
     if (sessionId) {
-      void viewDetails(sessionId);
+      router.replace(`/master/practice-sessions/${sessionId}`);
     }
-  }, [searchParams, viewDetails]);
+  }, [router, searchParams]);
 
   useEffect(() => {
     void load();
@@ -251,8 +187,8 @@ export default function MasterPracticeSessionsPage() {
 
   async function deleteSession(sessionId: string) {
     const ok = await confirm({
-      title: "Delete practice session?",
-      message: "This permanently removes the session and all related data. This action cannot be undone.",
+      title: "Delete this session?",
+      message: "This cannot be undone.",
       confirmLabel: "Delete session",
       variant: "danger",
     });
@@ -270,14 +206,11 @@ export default function MasterPracticeSessionsPage() {
         return;
       }
       if (!res.ok) {
-        setError(payload.error ?? "Unable to delete session.");
+        setError(payload.error ?? "Could not delete this session.");
         return;
       }
 
-      if (details?.id === sessionId) {
-        closeDetails();
-      }
-      toast.success("Practice session deleted successfully.");
+      toast.success("Session deleted.");
       await load();
     } finally {
       setDeleteLoadingId(null);
@@ -285,72 +218,42 @@ export default function MasterPracticeSessionsPage() {
   }
 
   return (
-    <MasterShell
-      title="Practice Interviews"
-      subtitle="Monitor, analyze, and manage candidate practice interviews in real time."
-      topActions={
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="admin-btn-ghost inline-flex items-center gap-2 !px-4 !py-2.5"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Refresh
-        </button>
-      }
-    >
-      <div className="space-y-5">
+    <MasterShell title="Practice interviews" subtitle="Candidates practising on Uhired.">
+      <div className="space-y-3">
         {error ? <MasterAlert variant="error">{error}</MasterAlert> : null}
-
-        {details !== null || detailsLoadingId !== null ? (
-          <MasterPracticeSessionDetailModal
-            open
-            loading={detailsLoadingId !== null && details === null}
-            session={details}
-            onClose={closeDetails}
-            onDelete={(sessionId) => void deleteSession(sessionId)}
-            deleteBusy={details !== null && deleteLoadingId === details.id}
-          />
-        ) : (
-        <>
-        <MasterHero
-          badge="Practice interviews"
-          title="Practice interview monitoring"
-          subtitle="Track candidate performance, revenue, and live session activity across all practice interviews."
-        />
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MasterKpiCard
-            label="Total Sessions"
+            label="Sessions"
             value={data?.metrics.totalSessions ?? 0}
             icon={ScrollText}
             accent="bg-primary/12 text-primary"
           />
           <MasterKpiCard
-            label="Avg. Performance"
+            label="Avg score"
             value={`${(data?.metrics.avgPerformance ?? 0).toFixed(1)}%`}
             icon={TrendingUp}
             accent="bg-violet/12 text-violet"
           />
           <MasterKpiCard
-            label="Revenue Stream"
+            label="Revenue"
             value={inrCurrencyFormatter.format(data?.metrics.revenueStream ?? 0)}
             icon={CreditCard}
             accent="bg-success/12 text-success"
           />
           <MasterKpiCard
-            label="Active Now"
+            label="Live now"
             value={data?.metrics.activeNow ?? 0}
             icon={Activity}
             accent="bg-cyan/12 text-cyan"
           />
         </section>
 
-        <MasterCard elevated title="Practice sessions" subtitle="Filter by candidate, status, payment, track, date, or score.">
-          <div className="mb-4 rounded-xl border border-border bg-surface/40 p-4 sm:p-5">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:items-end">
-              <label className="block space-y-1.5">
-                <span className="admin-label">Search sessions</span>
+        <section className="admin-card overflow-hidden">
+          <div className="space-y-3 p-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4 xl:items-end">
+              <label className="block space-y-1">
+                <span className="admin-label">Search</span>
                 <div className="relative">
                   <Search
                     className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
@@ -362,31 +265,13 @@ export default function MasterPracticeSessionsPage() {
                     onKeyDown={(event) => {
                       if (event.key === "Enter") applyFilters();
                     }}
-                    placeholder="Candidate name, email, track..."
+                    placeholder="Name or email"
                     className={`${masterInputClass} w-full pl-10`}
                   />
                 </div>
               </label>
 
-              <label className="block space-y-1.5">
-                <span className="admin-label">Status</span>
-                <MasterSelect
-                  value={statusInput}
-                  onValueChange={(value) =>
-                    setStatusInput(value as "" | "READY" | "LIVE" | "COMPLETED")
-                  }
-                  className="w-full"
-                  aria-label="Filter by status"
-                  options={[
-                    { value: "", label: "All statuses" },
-                    { value: "LIVE", label: "LIVE" },
-                    { value: "READY", label: "READY" },
-                    { value: "COMPLETED", label: "COMPLETED" },
-                  ]}
-                />
-              </label>
-
-              <label className="block space-y-1.5">
+              <label className="block space-y-1">
                 <span className="admin-label">Payment</span>
                 <MasterSelect
                   value={paymentInput}
@@ -396,7 +281,7 @@ export default function MasterPracticeSessionsPage() {
                   className="w-full"
                   aria-label="Filter by payment"
                   options={[
-                    { value: "", label: "All payments" },
+                    { value: "", label: "All" },
                     { value: "PAID", label: "Paid" },
                     { value: "PROMO", label: "Promo" },
                     { value: "UNPAID", label: "Unpaid" },
@@ -404,39 +289,49 @@ export default function MasterPracticeSessionsPage() {
                 />
               </label>
 
+              <label className="block space-y-1">
+                <span className="admin-label">Track</span>
+                <input
+                  value={trackInput}
+                  onChange={(event) => setTrackInput(event.target.value)}
+                  placeholder="Engineering, UI/UX"
+                  className={`${masterInputClass} w-full`}
+                />
+              </label>
+
               <div className="flex items-end gap-2">
                 <button
                   type="button"
                   onClick={applyFilters}
-                  className={`${masterBtnPrimary} inline-flex h-[2.75rem] flex-1 items-center justify-center gap-2 !px-4`}
+                  className={`${masterBtnPrimary} inline-flex h-10 flex-1 items-center justify-center gap-2 !px-4`}
                 >
                   <Search className="h-4 w-4" aria-hidden="true" />
                   Search
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void load()}
+                  className={`${masterBtnGhost} inline-flex h-10 items-center justify-center !px-3`}
+                  aria-label="Refresh"
+                  title="Refresh"
+                >
+                  <RefreshCw className="h-4 w-4" />
                 </button>
                 {hasActiveFilters ? (
                   <button
                     type="button"
                     onClick={clearFilters}
-                    className={`${masterBtnGhost} inline-flex h-[2.75rem] items-center justify-center gap-2 !px-4`}
+                    className={`${masterBtnGhost} inline-flex h-10 items-center justify-center !px-3`}
+                    aria-label="Clear filters"
+                    title="Clear filters"
                   >
-                    <X className="h-4 w-4" aria-hidden="true" />
-                    Clear
+                    <X className="h-4 w-4" />
                   </button>
                 ) : null}
               </div>
 
-              <label className="block space-y-1.5">
-                <span className="admin-label">Track / domain</span>
-                <input
-                  value={trackInput}
-                  onChange={(event) => setTrackInput(event.target.value)}
-                  placeholder="e.g. Engineering, UI/UX"
-                  className={`${masterInputClass} w-full`}
-                />
-              </label>
-
-              <label className="block space-y-1.5">
-                <span className="admin-label">From date</span>
+              <label className="block space-y-1">
+                <span className="admin-label">From</span>
                 <input
                   type="date"
                   value={fromDateInput}
@@ -445,8 +340,8 @@ export default function MasterPracticeSessionsPage() {
                 />
               </label>
 
-              <label className="block space-y-1.5">
-                <span className="admin-label">To date</span>
+              <label className="block space-y-1">
+                <span className="admin-label">To</span>
                 <input
                   type="date"
                   value={toDateInput}
@@ -455,35 +350,34 @@ export default function MasterPracticeSessionsPage() {
                 />
               </label>
 
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block min-w-0 space-y-1.5">
-                  <span className="admin-label">Min score</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={scoreMinInput}
-                    onChange={(event) => setScoreMinInput(event.target.value)}
-                    placeholder="0"
-                    className={`${masterInputClass} w-full`}
-                  />
-                </label>
-                <label className="block min-w-0 space-y-1.5">
-                  <span className="admin-label">Max score</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={scoreMaxInput}
-                    onChange={(event) => setScoreMaxInput(event.target.value)}
-                    placeholder="100"
-                    className={`${masterInputClass} w-full`}
-                  />
-                </label>
-              </div>
+              <label className="block min-w-0 space-y-1">
+                <span className="admin-label">Min score</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={scoreMinInput}
+                  onChange={(event) => setScoreMinInput(event.target.value)}
+                  placeholder="0"
+                  className={`${masterInputClass} w-full`}
+                />
+              </label>
+
+              <label className="block min-w-0 space-y-1">
+                <span className="admin-label">Max score</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={scoreMaxInput}
+                  onChange={(event) => setScoreMaxInput(event.target.value)}
+                  placeholder="100"
+                  className={`${masterInputClass} w-full`}
+                />
+              </label>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {(["", "LIVE", "COMPLETED", "READY"] as const).map((status) => (
                 <button
                   key={status || "all"}
@@ -493,103 +387,57 @@ export default function MasterPracticeSessionsPage() {
                     setAppliedStatus(status);
                     setPage(1);
                   }}
-                  className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
                     appliedStatus === status
-                      ? "text-primary-foreground shadow-[var(--shadow-glow)]"
+                      ? "text-primary-foreground"
                       : "bg-surface/60 text-muted-foreground ring-1 ring-border hover:text-foreground"
                   }`}
                   style={
                     appliedStatus === status ? { background: "var(--gradient-brand)" } : undefined
                   }
                 >
-                  {status === "" ? "All" : status}
+                  {status === "" ? "All" : formatStatus(status)}
                 </button>
               ))}
             </div>
-
-            {hasActiveFilters ? (
-              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                  Active filters
-                </span>
-                {appliedSearch ? (
-                  <span className="rounded-full bg-surface/80 px-2.5 py-1 text-xs font-medium text-foreground ring-1 ring-border">
-                    Search: {appliedSearch}
-                  </span>
-                ) : null}
-                {appliedStatus ? (
-                  <span className="rounded-full bg-surface/80 px-2.5 py-1 text-xs font-medium text-foreground ring-1 ring-border">
-                    Status: {appliedStatus}
-                  </span>
-                ) : null}
-                {appliedPayment ? (
-                  <span className="rounded-full bg-surface/80 px-2.5 py-1 text-xs font-medium text-foreground ring-1 ring-border">
-                    Payment: {appliedPayment}
-                  </span>
-                ) : null}
-                {appliedTrack ? (
-                  <span className="rounded-full bg-surface/80 px-2.5 py-1 text-xs font-medium text-foreground ring-1 ring-border">
-                    Track: {appliedTrack}
-                  </span>
-                ) : null}
-                {appliedFromDate ? (
-                  <span className="rounded-full bg-surface/80 px-2.5 py-1 text-xs font-medium text-foreground ring-1 ring-border">
-                    From: {appliedFromDate}
-                  </span>
-                ) : null}
-                {appliedToDate ? (
-                  <span className="rounded-full bg-surface/80 px-2.5 py-1 text-xs font-medium text-foreground ring-1 ring-border">
-                    To: {appliedToDate}
-                  </span>
-                ) : null}
-                {appliedScoreMin ? (
-                  <span className="rounded-full bg-surface/80 px-2.5 py-1 text-xs font-medium text-foreground ring-1 ring-border">
-                    Min score: {appliedScoreMin}
-                  </span>
-                ) : null}
-                {appliedScoreMax ? (
-                  <span className="rounded-full bg-surface/80 px-2.5 py-1 text-xs font-medium text-foreground ring-1 ring-border">
-                    Max score: {appliedScoreMax}
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
           </div>
+
           <div className="overflow-x-auto">
             <table className="w-full min-w-[960px] text-left text-sm">
               <thead>
                 <tr className={masterTableHeadClass}>
-                  <th className="py-2 pr-3">Date / Time</th>
-                  <th className="pr-3">Candidate</th>
-                  <th className="pr-3">Track</th>
-                  <th className="pr-3">Status</th>
-                  <th className="pr-3">Duration</th>
-                  <th className="pr-3">AI Score</th>
-                  <th className="pr-3">Payment</th>
-                  <th className="w-10 text-right"> </th>
+                  <th className="px-3 py-2">Date</th>
+                  <th className="px-3 py-2">Candidate</th>
+                  <th className="px-3 py-2">Track</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Duration</th>
+                  <th className="px-3 py-2">Score</th>
+                  <th className="px-3 py-2">Payment</th>
+                  <th className="w-10 px-3 py-2 text-right"> </th>
                 </tr>
               </thead>
               <tbody>
                 {(data?.rows ?? []).map((row) => (
-                  <tr key={row.id} className="border-b border-border transition hover:bg-surface/40">
-                    <td className="py-3 pr-3 text-xs text-muted-foreground">
-                      {new Date(row.createdAt).toLocaleString()}
+                  <tr key={row.id} className="border-t border-border">
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                      {new Date(row.createdAt).toLocaleString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
                     </td>
-                    <td className="pr-3">
-                      <p className="font-semibold text-foreground">{row.candidateName}</p>
+                    <td className="px-3 py-2">
+                      <p className="font-medium text-foreground">{row.candidateName}</p>
                       <p className="text-xs text-muted-foreground">{row.candidateEmail}</p>
                     </td>
-                    <td className="pr-3">
-                      <span className="rounded-full bg-primary/12 px-2 py-0.5 text-[10px] font-bold uppercase text-primary ring-1 ring-primary/25">
-                        {row.track}
-                      </span>
-                    </td>
-                    <td className="pr-3 text-xs font-semibold text-foreground">{row.status}</td>
-                    <td className="pr-3 text-foreground/85">{row.durationLabel}</td>
-                    <td className="pr-3 font-medium text-foreground">{row.score ?? "—"}</td>
-                    <td className="pr-3">
+                    <td className="px-3 py-2 text-foreground">{row.track}</td>
+                    <td className="px-3 py-2 text-foreground">{formatStatus(row.status)}</td>
+                    <td className="px-3 py-2 text-foreground">{row.durationLabel}</td>
+                    <td className="px-3 py-2 text-foreground">{row.score ?? "—"}</td>
+                    <td className="px-3 py-2">
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ring-1 ${
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${
                           row.paymentType === "PAID"
                             ? "bg-success/12 text-success ring-success/25"
                             : row.paymentType === "PROMO"
@@ -597,18 +445,17 @@ export default function MasterPracticeSessionsPage() {
                               : "bg-surface/80 text-muted-foreground ring-border"
                         }`}
                       >
-                        {row.paymentType}
+                        {formatPayment(row.paymentType)}
                       </span>
                     </td>
-                    <td className="text-right">
+                    <td className="px-3 py-2 text-right">
                       <MasterRowActionsMenu
                         label={row.candidateName}
                         actions={[
                           {
-                            label: detailsLoadingId === row.id ? "Loading..." : "View",
+                            label: "View",
                             icon: Eye,
-                            onClick: () => void viewDetails(row.id),
-                            disabled: detailsLoadingId === row.id,
+                            onClick: () => router.push(`/master/practice-sessions/${row.id}`),
                           },
                           {
                             label: deleteLoadingId === row.id ? "Deleting..." : "Delete",
@@ -624,20 +471,20 @@ export default function MasterPracticeSessionsPage() {
               </tbody>
             </table>
           </div>
-          <MasterPagination
-            page={page}
-            pageSize={pageSize}
-            totalItems={data?.pagination.total ?? 0}
-            itemLabel="sessions"
-            onPageChange={setPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setPage(1);
-            }}
-          />
-        </MasterCard>
-        </>
-        )}
+          <div className="px-3 pb-3">
+            <MasterPagination
+              page={page}
+              pageSize={pageSize}
+              totalItems={data?.pagination.total ?? 0}
+              itemLabel="sessions"
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+            />
+          </div>
+        </section>
       </div>
     </MasterShell>
   );

@@ -1,0 +1,34 @@
+# Auto-deploy to Coolify on every push.
+# Coolify UI also has "Auto Deploy" (webhook) — use either that OR this workflow.
+#
+# Setup (GitHub → Settings → Secrets and variables → Actions):
+#   COOLIFY_WEBHOOK_URL = Deploy Webhook URL from Coolify → Application → Webhooks
+name: Coolify Auto Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - version-0.1
+  workflow_dispatch:
+
+concurrency:
+  group: coolify-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trigger-coolify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Coolify deployment webhook
+        env:
+          WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "::error::Missing secret COOLIFY_WEBHOOK_URL. Copy it from Coolify → your app → Webhooks."
+            exit 1
+          fi
+          echo "Triggering Coolify deploy for ${{ github.sha }}..."
+          curl -fsS -X GET "$WEBHOOK_URL"
+          echo
+          echo "Coolify deploy triggered."

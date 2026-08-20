@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AudioLines, Menu, Moon, Sun, X } from "lucide-react";
+import { Menu, Moon, Sun, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BrandLogo } from "@/components/brand-logo";
 import { useSiteTheme } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 import { ButtonLink } from "./shared";
@@ -21,17 +22,7 @@ const links = [
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <Link href="/" className={cn("flex items-center gap-2.5 no-underline", className)} aria-label="Uhired AI home">
-      <span
-        className="grid h-9 w-9 place-items-center rounded-xl text-primary-foreground"
-        style={{ background: "var(--gradient-brand)" }}
-      >
-        <AudioLines className="h-5 w-5" aria-hidden="true" />
-      </span>
-      <span className="font-display text-lg font-bold tracking-tight">
-        Uhired <span className="text-gradient">AI</span>
-      </span>
-    </Link>
+    <BrandLogo className={className} variant="theme" markSize={32} priority />
   );
 }
 
@@ -102,7 +93,7 @@ export function Navbar() {
     >
       <nav
         aria-label="Main"
-        className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 py-3.5 sm:px-8"
+        className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 py-3 sm:px-8"
       >
         <div className="flex min-w-0 items-center gap-8">
           <Logo />

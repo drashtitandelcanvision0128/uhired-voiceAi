@@ -18,6 +18,7 @@ import { MasterShell } from "@/components/master-shell";
 import {
   MasterAlert,
   MasterKpiCard,
+  MasterStatusBadge,
   masterBtnGhost,
   masterBtnPrimary,
 } from "@/components/master-ui";
@@ -36,6 +37,29 @@ type CompanyView = {
   liveSessions?: number;
   candidateCount?: number;
   requirementCount?: number;
+  recentSessions?: Array<{
+    id: string;
+    candidateName: string;
+    candidateEmail: string;
+    role: string;
+    status: string;
+    createdAt: string;
+  }>;
+  jobs?: Array<{
+    id: string;
+    title: string;
+    domain: string;
+    durationMin: number;
+    createdAt: string;
+  }>;
+  members?: Array<{
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    isActive: boolean;
+    lastLoginAt: string | null;
+  }>;
   error?: string;
 };
 
@@ -50,7 +74,15 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatDate(value?: string) {
+function memberRoleLabel(role: string) {
+  if (role === "ADMIN") return "Admin";
+  if (role === "RECRUITER") return "Recruiter";
+  if (role === "HIRING_MANAGER") return "Hiring manager";
+  if (role === "VIEWER") return "Viewer";
+  return role;
+}
+
+function formatDate(value?: string | null) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
@@ -114,24 +146,7 @@ export default function MasterViewCompanyPage({
   return (
     <MasterShell
       title={data?.companyName || "Company"}
-      subtitle="View this client's login, interviewer, and interview activity."
-      topActions={
-        <div className="flex flex-wrap items-center gap-2">
-          <Link href="/master/companies" className={`${masterBtnGhost} inline-flex items-center gap-2 !px-3 !py-2`}>
-            <ArrowLeft className="h-4 w-4" />
-            Back to list
-          </Link>
-          {companyId ? (
-            <Link
-              href={`/master/companies/${companyId}/edit`}
-              className={`${masterBtnPrimary} inline-flex items-center gap-2 !px-3 !py-2`}
-            >
-              <Pencil className="h-4 w-4" />
-              Edit
-            </Link>
-          ) : null}
-        </div>
-      }
+      subtitle="Logins, interviewer, and interviews for this company."
     >
       <div className="space-y-3">
         {error ? <MasterAlert variant="error">{error}</MasterAlert> : null}
@@ -233,8 +248,105 @@ export default function MasterViewCompanyPage({
                 </div>
               </div>
             </section>
+
+            <section className="admin-card overflow-hidden">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <p className="text-sm font-semibold text-foreground">Team</p>
+              </div>
+              {(data.members ?? []).length ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[480px] text-left text-sm">
+                    <thead>
+                      <tr className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                        <th className="px-4 py-2">Name</th>
+                        <th className="pr-4">Email</th>
+                        <th className="pr-4">Role</th>
+                        <th className="pr-4">Last login</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.members ?? []).map((member) => (
+                        <tr key={member.id} className="border-t border-border">
+                          <td className="px-4 py-2 font-semibold text-foreground">{member.name || "—"}</td>
+                          <td className="pr-4 text-muted-foreground">{member.email}</td>
+                          <td className="pr-4 text-foreground">{memberRoleLabel(member.role)}</td>
+                          <td className="pr-4 text-muted-foreground">{formatDate(member.lastLoginAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="px-4 py-6 text-sm text-muted-foreground">No team members yet.</p>
+              )}
+            </section>
+
+            <section className="grid gap-3 lg:grid-cols-2">
+              <div className="admin-card overflow-hidden">
+                <div className="border-b border-border px-4 py-3">
+                  <p className="text-sm font-semibold text-foreground">Jobs</p>
+                </div>
+                {(data.jobs ?? []).length ? (
+                  <ul className="divide-y divide-border">
+                    {(data.jobs ?? []).map((job) => (
+                      <li key={job.id} className="px-4 py-2.5">
+                        <p className="text-sm font-semibold text-foreground">{job.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {job.domain} · {job.durationMin} min
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="px-4 py-6 text-sm text-muted-foreground">No jobs yet.</p>
+                )}
+              </div>
+
+              <div className="admin-card overflow-hidden">
+                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                  <p className="text-sm font-semibold text-foreground">Recent interviews</p>
+                  <Link
+                    href={`/master/company-sessions?search=${encodeURIComponent(data.companyName)}`}
+                    className="text-xs font-semibold text-primary no-underline hover:underline"
+                  >
+                    All
+                  </Link>
+                </div>
+                {(data.recentSessions ?? []).length ? (
+                  <ul className="divide-y divide-border">
+                    {(data.recentSessions ?? []).map((session) => (
+                      <li key={session.id} className="flex items-center justify-between gap-2 px-4 py-2.5">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">{session.candidateName}</p>
+                          <p className="truncate text-xs text-muted-foreground">{session.role}</p>
+                        </div>
+                        <MasterStatusBadge status={session.status} />
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="px-4 py-6 text-sm text-muted-foreground">No interviews yet.</p>
+                )}
+              </div>
+            </section>
           </>
         ) : null}
+
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3">
+          <Link href="/master/companies" className={`${masterBtnGhost} inline-flex items-center gap-2 !px-3 !py-2`}>
+            <ArrowLeft className="h-4 w-4" />
+            Back to list
+          </Link>
+          {companyId ? (
+            <Link
+              href={`/master/companies/${companyId}/edit`}
+              className={`${masterBtnPrimary} inline-flex items-center gap-2 !px-3 !py-2`}
+            >
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Link>
+          ) : null}
+        </div>
       </div>
     </MasterShell>
   );

@@ -254,7 +254,7 @@ export function MasterHeaderControls({ onLogout, middleActions }: MasterHeaderCo
               className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-foreground no-underline transition hover:bg-surface/60"
             >
               <Settings className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              System Settings
+              Settings
             </Link>
             <Link
               href="/master/help-center"
@@ -262,7 +262,7 @@ export function MasterHeaderControls({ onLogout, middleActions }: MasterHeaderCo
               className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-foreground no-underline transition hover:bg-surface/60"
             >
               <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              Help Center
+              Help
             </Link>
             <button
               type="button"

@@ -4,11 +4,15 @@ import {
   ensureMasterAdminAccountFromEnv,
   findMasterAdminAccountByEmail,
   hashMasterPassword,
+  getMasterAdminAccountByEmail,
   updateMasterAdminAccount,
   verifyMasterPassword,
 } from "@/lib/master-admin-account";
-import { getMasterAdminEmail } from "@/lib/master-auth";
-import { hasMasterSessionFromRequest } from "@/lib/master-auth";
+import {
+  getMasterAdminEmail,
+  getMasterSessionEmailFromRequest,
+  hasMasterSessionFromRequest,
+} from "@/lib/master-auth";
 import { getLastSuccessfulMasterLogin } from "@/lib/master-login-audit";
 import { prisma } from "@/lib/prisma";
 
@@ -36,14 +40,25 @@ const updateProfileSchema = z
     }
   });
 
+async function resolveCurrentMasterAccount(request: Request) {
+  await ensureMasterAdminAccountFromEnv(prisma);
+  const sessionEmail = getMasterSessionEmailFromRequest(request);
+  if (sessionEmail) {
+    const bySession = await getMasterAdminAccountByEmail(prisma, sessionEmail);
+    if (bySession) return bySession;
+  }
+  return getMasterAdminAccountByEmail(prisma, getMasterAdminEmail()) ?? null;
+}
+
 export async function GET(request: Request) {
   if (!hasMasterSessionFromRequest(request)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
   try {
-    const account = await ensureMasterAdminAccountFromEnv(prisma);
-    const email = account?.email ?? getMasterAdminEmail();
+    const account = await resolveCurrentMasterAccount(request);
+    const email =
+      account?.email ?? getMasterSessionEmailFromRequest(request) ?? getMasterAdminEmail();
     const lastLogin = email ? await getLastSuccessfulMasterLogin(prisma, email) : null;
 
     return NextResponse.json({
@@ -67,7 +82,7 @@ export async function PATCH(request: Request) {
 
   try {
     const body = updateProfileSchema.parse(await request.json());
-    const account = await ensureMasterAdminAccountFromEnv(prisma);
+    const account = await resolveCurrentMasterAccount(request);
 
     if (!account) {
       return NextResponse.json(
