@@ -59,6 +59,7 @@ scripts/*
 !scripts/docker-entrypoint.sh
 !scripts/baseline-migrations.mjs
 !scripts/import-sqltables.mjs
+!scripts/seed-production-bootstrap.mjs
 !scripts/coolify-db-baseline.sh
 !scripts/coolify-db-import.sh
 

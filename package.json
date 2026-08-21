@@ -25,6 +25,8 @@
     "test:load": "npx tsx --env-file=.env scripts/test-concurrent-load.mjs",
     "db:backfill:company-members": "npx tsx --env-file=.env scripts/backfill-company-members.mjs",
     "db:import:sqltables": "node scripts/import-sqltables.mjs",
+    "db:seed:bootstrap": "node scripts/seed-production-bootstrap.mjs",
+    "db:seed:dev-admin": "node scripts/seed-dev-admin.mjs",
     "storage:backfill:supabase-to-s3": "node scripts/backfill-videos-supabase-to-s3.mjs",
     "scoring:batch:submit": "node scripts/scoring-batch-submit.mjs",
     "scoring:batch:sync": "node scripts/scoring-batch-sync.mjs",

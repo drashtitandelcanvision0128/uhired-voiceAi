@@ -85,6 +85,7 @@ COPY --chown=nextjs:nodejs --from=prisma-tools /prisma-tools/node_modules /prism
 COPY --chown=nextjs:nodejs --from=builder /app/scripts/docker-entrypoint.sh ./docker-entrypoint.sh
 COPY --chown=nextjs:nodejs --from=builder /app/scripts/baseline-migrations.mjs ./scripts/baseline-migrations.mjs
 COPY --chown=nextjs:nodejs --from=builder /app/scripts/import-sqltables.mjs ./scripts/import-sqltables.mjs
+COPY --chown=nextjs:nodejs --from=builder /app/scripts/seed-production-bootstrap.mjs ./scripts/seed-production-bootstrap.mjs
 COPY --chown=nextjs:nodejs --from=builder /app/scripts/coolify-db-baseline.sh ./scripts/coolify-db-baseline.sh
 COPY --chown=nextjs:nodejs --from=builder /app/scripts/coolify-db-import.sh ./scripts/coolify-db-import.sh
 COPY --chown=nextjs:nodejs --from=builder /app/sqltables ./sqltables

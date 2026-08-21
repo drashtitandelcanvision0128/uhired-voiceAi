@@ -55,5 +55,20 @@ else
   echo "[entrypoint] DATABASE_URL is not set — skipping migrations."
 fi
 
+# Idempotent Uhired company + master admin rows (safe on every deploy).
+should_seed=true
+case "${SEED_BOOTSTRAP:-true}" in
+  0|false|FALSE|no|NO|off|OFF) should_seed=false ;;
+esac
+
+if [ "$should_seed" = "true" ] && [ -n "$DATABASE_URL" ]; then
+  echo "[entrypoint] Seeding bootstrap data (company + master admin)..."
+  node scripts/seed-production-bootstrap.mjs || {
+    echo "[entrypoint] WARNING: bootstrap seed failed (app will still start)."
+  }
+elif [ "$should_seed" = "false" ]; then
+  echo "[entrypoint] SEED_BOOTSTRAP=false — skipping bootstrap seed."
+fi
+
 echo "[entrypoint] Starting application..."
 exec node server.js
