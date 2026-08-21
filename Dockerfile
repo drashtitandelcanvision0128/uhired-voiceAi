@@ -51,6 +51,14 @@ RUN npx prisma generate
 # (PostCSS worker "timed out waiting for the Node.js process to connect").
 RUN npx next build --webpack
 
+# Slim Prisma CLI only — copying full deps node_modules into the runner OOMs / fills
+# disk on small Coolify VPS builders (build succeeds, then exit 255 with no #18 step).
+FROM base AS prisma-tools
+WORKDIR /prisma-tools
+RUN npm init -y \
+  && npm install prisma@6.18.0 --no-audit --no-fund \
+  && rm -rf /root/.npm /tmp/*
+
 # Production image
 FROM base AS runner
 WORKDIR /app
@@ -71,8 +79,8 @@ COPY --chown=nextjs:nodejs --from=builder /app/prisma ./prisma
 COPY --chown=nextjs:nodejs --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --chown=nextjs:nodejs --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-# Isolated Prisma CLI + full dependency tree for migrate deploy (avoids standalone npm conflicts)
-COPY --chown=nextjs:nodejs --from=deps /app/node_modules /prisma-tools/node_modules
+# Isolated Prisma CLI for migrate deploy (avoids standalone npm conflicts)
+COPY --chown=nextjs:nodejs --from=prisma-tools /prisma-tools/node_modules /prisma-tools/node_modules
 
 COPY --chown=nextjs:nodejs --from=builder /app/scripts/docker-entrypoint.sh ./docker-entrypoint.sh
 COPY --chown=nextjs:nodejs --from=builder /app/scripts/baseline-migrations.mjs ./scripts/baseline-migrations.mjs
