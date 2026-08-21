@@ -65,6 +65,9 @@ scripts/*
 # Live data export for production import
 !sqltables/
 
+# Local interview artifacts — not needed to build the image
+public/interview-videos/*.json
+
 # Database
 prisma/dev.db
 prisma/migrations/migration_lock.toml

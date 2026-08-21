@@ -40,13 +40,16 @@ ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
     NEXT_PUBLIC_INTERVIEW_PRICE_PAISE=$NEXT_PUBLIC_INTERVIEW_PRICE_PAISE \
     NEXT_PUBLIC_INTERVIEW_CURRENCY=$NEXT_PUBLIC_INTERVIEW_CURRENCY \
     DATABASE_URL=$DATABASE_URL \
-    DIRECT_URL=$DIRECT_URL
+    DIRECT_URL=$DIRECT_URL \
+    NEXT_TELEMETRY_DISABLED=1 \
+    NODE_OPTIONS="--max-old-space-size=2048"
 
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Build Next.js
-RUN npm run build
+# Webpack: Turbopack production builds can hang/timeout in small Coolify VPS images
+# (PostCSS worker "timed out waiting for the Node.js process to connect").
+RUN npx next build --webpack
 
 # Production image
 FROM base AS runner
