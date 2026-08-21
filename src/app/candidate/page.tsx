@@ -12,7 +12,6 @@ import {
   Mail,
   ShieldCheck,
   Video,
-  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
@@ -338,10 +337,12 @@ export default function CandidatePage() {
               </button>
 
               <div className="mt-5 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/8 px-4 py-3.5">
-                <Zap className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  <span className="font-bold text-foreground">Before you begin:</span> camera and
-                  microphone checks run inside the interview room.
+                  <span className="font-bold text-foreground">Security tip:</span> use your personal
+                  invite link only. Do not share the interview code on WhatsApp/social — it is
+                  single-use and locked to this browser once you start. Keep a stable internet
+                  connection for the best scoring accuracy.
                 </p>
               </div>
             </form>

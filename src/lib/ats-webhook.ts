@@ -13,11 +13,15 @@ export type AtsWebhookPayload = {
   completedAt: string;
 };
 
-export async function dispatchAtsWebhook(input: {
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function postOnce(input: {
   webhookUrl: string;
   secret?: string | null;
   payload: AtsWebhookPayload;
-}) {
+}): Promise<{ ok: boolean; status?: number; error?: string }> {
   const body = JSON.stringify(input.payload);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -42,13 +46,43 @@ export async function dispatchAtsWebhook(input: {
       signal: controller.signal,
     });
     if (!response.ok) {
-      console.warn(
-        `[ats-webhook] ${input.webhookUrl} returned ${response.status}`,
-      );
+      return { ok: false, status: response.status, error: `HTTP ${response.status}` };
     }
+    return { ok: true, status: response.status };
   } catch (error) {
-    console.error("[ats-webhook] dispatch failed:", error);
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "ATS webhook dispatch failed",
+    };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * Dispatch ATS webhook with bounded retries (network / 5xx friendly).
+ */
+export async function dispatchAtsWebhook(input: {
+  webhookUrl: string;
+  secret?: string | null;
+  payload: AtsWebhookPayload;
+  maxAttempts?: number;
+}) {
+  const maxAttempts = Math.min(Math.max(input.maxAttempts ?? 3, 1), 5);
+  let lastError = "";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const result = await postOnce(input);
+    if (result.ok) return { ok: true as const, attempts: attempt };
+    lastError = result.error ?? "unknown";
+    console.warn(
+      `[ats-webhook] attempt ${attempt}/${maxAttempts} failed for ${input.webhookUrl}: ${lastError}`,
+    );
+    if (attempt < maxAttempts) {
+      await sleep(500 * attempt * attempt);
+    }
+  }
+
+  console.error(`[ats-webhook] gave up after ${maxAttempts} attempts: ${lastError}`);
+  return { ok: false as const, attempts: maxAttempts, error: lastError };
 }

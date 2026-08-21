@@ -91,9 +91,9 @@ export default function MasterCompanySessionsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<MasterPageSize>(MASTER_PAGE_SIZE_OPTIONS[0]);
   const [searchInput, setSearchInput] = useState("");
-  const [statusInput, setStatusInput] = useState<"" | "READY" | "LIVE" | "COMPLETED">("");
+  const [statusInput, setStatusInput] = useState<"" | "READY" | "LIVE" | "COMPLETED" | "FAILED">("");
   const [appliedSearch, setAppliedSearch] = useState("");
-  const [appliedStatus, setAppliedStatus] = useState<"" | "READY" | "LIVE" | "COMPLETED">("");
+  const [appliedStatus, setAppliedStatus] = useState<"" | "READY" | "LIVE" | "COMPLETED" | "FAILED">("");
   const hasActiveFilters = Boolean(appliedSearch || appliedStatus);
 
   const load = useCallback(async () => {
@@ -165,7 +165,7 @@ export default function MasterCompanySessionsPage() {
       setPage(1);
     }
     const status = searchParams.get("status");
-    if (status === "LIVE" || status === "READY" || status === "COMPLETED") {
+    if (status === "LIVE" || status === "READY" || status === "COMPLETED" || status === "FAILED") {
       setStatusInput(status);
       setAppliedStatus(status);
       setPage(1);
@@ -287,6 +287,7 @@ export default function MasterCompanySessionsPage() {
                         { value: "LIVE", label: "Live" },
                         { value: "READY", label: "Ready" },
                         { value: "COMPLETED", label: "Completed" },
+                        { value: "FAILED", label: "Failed" },
                       ]}
                     />
                   </label>
@@ -333,7 +334,7 @@ export default function MasterCompanySessionsPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
-                  {(["", "LIVE", "READY", "COMPLETED"] as const).map((status) => (
+                  {(["", "LIVE", "READY", "COMPLETED", "FAILED"] as const).map((status) => (
                     <button
                       key={status || "all"}
                       type="button"

@@ -25,6 +25,11 @@ import {
 } from "@/lib/interview-questions";
 import { getCachedRealtimeInstructions } from "@/lib/realtime-instruction-cache";
 import { resolveInterviewLanguage } from "@/lib/interview-languages";
+import {
+  checkRateLimitAsync,
+  getClientIpFromRequest,
+  rateLimitResponse,
+} from "@/lib/rate-limit";
 
 type Context = {
   params: Promise<{ sessionId: string }>;
@@ -44,6 +49,17 @@ function parseVoiceGenderOverride(request: Request): Promise<InterviewerVoiceGen
 
 export async function POST(request: Request, context: Context) {
   const { sessionId } = await context.params;
+
+  const rate = await checkRateLimitAsync(
+    "interview-realtime",
+    `${getClientIpFromRequest(request)}:${sessionId}`,
+    30,
+    10 * 60 * 1000,
+  );
+  if (!rate.allowed) {
+    return NextResponse.json(rateLimitResponse(rate.retryAfterSec), { status: 429 });
+  }
+
   const voiceGenderOverride = await parseVoiceGenderOverride(request);
 
   const session = await withPrismaRetry(() =>

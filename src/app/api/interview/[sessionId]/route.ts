@@ -13,7 +13,7 @@ type Context = {
 };
 
 const patchSchema = z.object({
-  status: z.enum(["READY", "LIVE", "COMPLETED", "ready", "live", "completed"]),
+  status: z.enum(["READY", "LIVE", "ready", "live"]),
   /** When true, go LIVE without setting startedAt (client anchors it to the interview timer). */
   deferStartedAt: z.boolean().optional(),
   /** When true, set startedAt to now if still null (timer start). */
@@ -22,7 +22,7 @@ const patchSchema = z.object({
 
 function normalizeStatus(raw: string): SessionStatus {
   const upper = raw.toUpperCase();
-  if (upper === "READY" || upper === "LIVE" || upper === "COMPLETED") {
+  if (upper === "READY" || upper === "LIVE") {
     return upper as SessionStatus;
   }
   return "READY";
@@ -45,10 +45,14 @@ export async function PATCH(request: Request, context: Context) {
         return NextResponse.json({ error: "Unauthorized interview session access." }, { status: 401 });
       }
     }
-    const nextStatus = normalizeStatus(body.status);
-    if (existing.status === "COMPLETED" && nextStatus !== existing.status) {
-      return NextResponse.json({ error: "This interview cannot be reopened." }, { status: 409 });
+    if (existing.status === "COMPLETED" || existing.status === "FAILED") {
+      return NextResponse.json(
+        { error: "This interview is already finalized and cannot be updated." },
+        { status: 409 },
+      );
     }
+
+    const nextStatus = normalizeStatus(body.status);
 
     let nextStartedAt = existing.startedAt;
     if (body.markStartedAt && !existing.startedAt) {
@@ -64,17 +68,24 @@ export async function PATCH(request: Request, context: Context) {
       );
     }
 
-    const session = await withPrismaRetry(() =>
-      prisma.interviewSession.update({
-        where: { id: sessionId },
+    // CAS: refuse if another request already completed/failed the session.
+    const updated = await withPrismaRetry(() =>
+      prisma.interviewSession.updateMany({
+        where: { id: sessionId, status: { in: ["READY", "LIVE"] } },
         data: {
           status: nextStatus,
           startedAt: nextStartedAt,
         },
       }),
     );
+    if (updated.count === 0) {
+      return NextResponse.json(
+        { error: "This interview is already finalized and cannot be updated." },
+        { status: 409 },
+      );
+    }
 
-    return NextResponse.json({ id: session.id, status: session.status });
+    return NextResponse.json({ id: sessionId, status: nextStatus });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues[0]?.message }, { status: 400 });

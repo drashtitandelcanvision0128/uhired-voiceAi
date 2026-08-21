@@ -105,6 +105,8 @@ const STATUS_STYLES: Record<string, string> = {
   READY: "bg-sky-50 text-sky-700 ring-1 ring-sky-200/70 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-400/30",
   COMPLETED:
     "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/30",
+  FAILED:
+    "bg-slate-100 text-slate-700 ring-1 ring-slate-200/80 dark:bg-slate-500/20 dark:text-slate-200 dark:ring-slate-400/30",
 };
 
 function formatSessionDate(value: string) {
@@ -160,6 +162,7 @@ function sessionStatusLabel(status: string) {
   if (status === "LIVE") return "Live";
   if (status === "READY") return "Ready";
   if (status === "COMPLETED") return "Completed";
+  if (status === "FAILED") return "Failed";
   return status;
 }
 

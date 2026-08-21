@@ -18,6 +18,10 @@ import { BrandLogoMark } from "@/components/brand-logo";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
 import { INTERVIEW_CONSENT_SUMMARY } from "@/lib/interview-consent";
 import {
+  formatMediaPermissionError,
+  formatRealtimeConnectionError,
+} from "@/lib/interview-connection-errors";
+import {
   InterviewConversationManager,
   isInterviewerClosingRemark,
   type ConversationStateSnapshot,
@@ -1571,9 +1575,12 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
             transcript: buildTranscriptPayload(transcriptRef.current),
           }),
         });
+        const completePayload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          transcriptWarning?: string;
+        };
         if (!response.ok) {
-          const payload = (await response.json().catch(() => ({}))) as { error?: string };
-          throw new Error(payload.error ?? "Unable to complete the interview.");
+          throw new Error(completePayload.error ?? "Unable to complete the interview.");
         }
         completionBeaconSentRef.current = true;
         setStage("post");
@@ -1581,6 +1588,8 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
           setError(
             "Your interview was saved, but the video recording could not be uploaded. Please contact support if the hiring team needs the recording.",
           );
+        } else if (completePayload.transcriptWarning) {
+          setError(completePayload.transcriptWarning);
         }
         clearInterviewState(sessionId);
       } catch (finishError) {
@@ -1780,9 +1789,7 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
     } catch (preflightError) {
       setPermissionReady(false);
       setError(
-        preflightError instanceof Error
-          ? preflightError.message
-          : "Camera or microphone access was denied.",
+        formatMediaPermissionError(preflightError),
       );
     }
   };
@@ -2187,7 +2194,7 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
         data.error?.message ??
         data.response?.status_details?.error?.message ??
         "Voice interview connection error.";
-      setError(message);
+      setError(formatRealtimeConnectionError(message));
       return;
     }
 
@@ -2581,11 +2588,7 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
             setStage("live");
           } catch (reconnectError) {
             if (attempt >= MAX_ATTEMPTS) {
-              setError(
-                reconnectError instanceof Error
-                  ? reconnectError.message
-                  : "Unable to restore the voice connection.",
-              );
+              setError(formatRealtimeConnectionError(reconnectError));
               void finishInterviewRef.current?.("disconnect");
             } else {
               reconnectInFlightRef.current = false;
@@ -2783,11 +2786,7 @@ export function CompanyInterviewRoom(props: CompanyInterviewRoomProps) {
         setInterviewerStarting(false);
         cleanupConnectionRef.current();
         setStage("error");
-        setError(
-          startError instanceof Error
-            ? startError.message
-            : "Unable to start the realtime interview.",
-        );
+        setError(formatRealtimeConnectionError(startError));
       }
     });
   };

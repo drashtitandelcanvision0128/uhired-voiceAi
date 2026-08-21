@@ -17,7 +17,7 @@ import {
   type EmailProvider,
 } from "@/lib/smtp-delivery-mode";
 
-type InterviewInviteEmailInput = {
+export type InterviewInviteEmailInput = {
   to: string;
   companyName: string;
   roleTitle: string;

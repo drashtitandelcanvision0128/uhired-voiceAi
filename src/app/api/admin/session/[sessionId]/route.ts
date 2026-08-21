@@ -162,7 +162,10 @@ export async function PATCH(request: Request, context: Context) {
       if (body.candidateEmail !== undefined) nextData.candidateEmail = body.candidateEmail.toLowerCase();
       await prisma.$transaction(async (tx) => {
         await tx.interviewSession.update({ where: { id: existing.id }, data: nextData });
-        await syncCandidateFromSession(tx, existing.candidateId, nextData);
+        await syncCandidateFromSession(tx, existing.candidateId, {
+          ...nextData,
+          companyId: authCompany.companyId,
+        });
       });
       return NextResponse.json({ ok: true });
     }
@@ -207,6 +210,7 @@ export async function PATCH(request: Request, context: Context) {
         await syncCandidateFromSession(tx, existing.candidateId, {
           candidateName: body.candidateName,
           candidateEmail: body.candidateEmail,
+          companyId: authCompany.companyId,
         });
       }
 

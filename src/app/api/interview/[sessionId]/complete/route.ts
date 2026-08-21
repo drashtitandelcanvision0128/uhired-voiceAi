@@ -11,6 +11,12 @@ import {
   getCandidateInterviewSessionFromCookieHeader,
   isCandidateInterviewSessionGuardEnabled,
 } from "@/lib/candidate-interview-auth";
+import {
+  checkRateLimitAsync,
+  getClientIpFromRequest,
+  rateLimitResponse,
+} from "@/lib/rate-limit";
+import { assessTranscriptThinness, SCORING_FAIRNESS_NOTE } from "@/lib/scoring-trust";
 
 type Context = {
   params: Promise<{ sessionId: string }>;
@@ -67,6 +73,16 @@ async function mergeClientTranscript(
 
 export async function POST(request: Request, context: Context) {
   const { sessionId } = await context.params;
+
+  const rate = await checkRateLimitAsync(
+    "interview-complete",
+    `${getClientIpFromRequest(request)}:${sessionId}`,
+    8,
+    10 * 60 * 1000,
+  );
+  if (!rate.allowed) {
+    return NextResponse.json(rateLimitResponse(rate.retryAfterSec), { status: 429 });
+  }
 
   const session = await withPrismaRetry(() =>
     prisma.interviewSession.findUnique({
@@ -140,6 +156,12 @@ export async function POST(request: Request, context: Context) {
   if (session.status === "COMPLETED") {
     return NextResponse.json({ ok: true, alreadyFinalized: true });
   }
+  if (session.status === "FAILED") {
+    return NextResponse.json(
+      { error: "This interview was abandoned and cannot be completed." },
+      { status: 409 },
+    );
+  }
   const contentType = request.headers.get("content-type") ?? "";
   let body: z.infer<typeof completeBodySchema> = {};
   if (contentType.includes("application/json")) {
@@ -154,12 +176,37 @@ export async function POST(request: Request, context: Context) {
     }
   }
 
+  const startedAt = session.startedAt ?? new Date();
+  const endedAt =
+    body.durationSec != null && Number.isFinite(body.durationSec)
+      ? new Date(startedAt.getTime() + Math.round(body.durationSec) * 1000)
+      : new Date();
+
+  // Claim first so only one concurrent complete continues (CAS).
+  const claimed = await withPrismaRetry(() =>
+    prisma.interviewSession.updateMany({
+      where: { id: sessionId, status: { in: ["READY", "LIVE"] } },
+      data: {
+        status: "COMPLETED",
+        endedAt,
+        startedAt,
+      },
+    }),
+  );
+  if (claimed.count === 0) {
+    return NextResponse.json({ ok: true, alreadyFinalized: true });
+  }
+
   await mergeClientTranscript(sessionId, body.transcript);
 
   const turnsForScoring = await prisma.interviewTurn.findMany({
     where: { sessionId },
     orderBy: [{ orderIndex: "asc" }, { id: "asc" }],
   });
+
+  const thinTranscript = assessTranscriptThinness(
+    turnsForScoring.map((t) => ({ speaker: t.speaker, message: t.message })),
+  );
 
   const mandatoryQuestions = (session.questions.length ? session.questions : (session.requirement?.questions ?? []))
     .filter((q) => q.isMandatory)
@@ -180,25 +227,14 @@ export async function POST(request: Request, context: Context) {
   const scoringMode = score.scoringMode ?? "heuristic-immediate";
   const scoringModel = score.scoringModel;
 
-  // Prefer client interview-clock elapsed over wall clock so admin duration matches
-  // the allocated slot / recording metadata (not connect + upload overhead).
-  const startedAt = session.startedAt ?? new Date();
-  const endedAt =
-    body.durationSec != null && Number.isFinite(body.durationSec)
-      ? new Date(startedAt.getTime() + Math.round(body.durationSec) * 1000)
-      : new Date();
-
   const scoringJob = await withPrismaRetry(() =>
     prisma.$transaction(async (tx) => {
-      await tx.interviewSession.update({
-        where: { id: sessionId },
-        data: {
-          status: "COMPLETED",
-          endedAt,
-          startedAt,
-          ...(resolvedKeySkills.length > 0 ? { keySkills: resolvedKeySkills } : {}),
-        },
-      });
+      if (resolvedKeySkills.length > 0) {
+        await tx.interviewSession.update({
+          where: { id: sessionId },
+          data: { keySkills: resolvedKeySkills },
+        });
+      }
 
       const scorecardData = {
         overallScore: score.overallScore,
@@ -350,6 +386,9 @@ export async function POST(request: Request, context: Context) {
     gradingPending,
     accuracyPercent,
     questionResults,
+    fairnessNote: SCORING_FAIRNESS_NOTE,
+    thinTranscript: thinTranscript.thin,
+    ...(thinTranscript.warning ? { transcriptWarning: thinTranscript.warning } : {}),
     ...(gradingErrorMessage ? { gradingError: gradingErrorMessage } : {}),
   });
 }

@@ -43,18 +43,26 @@ const schema = z
     }
   });
 
+class PaymentAlreadyClaimedError extends Error {
+  constructor() {
+    super("PAYMENT_ALREADY_CLAIMED");
+    this.name = "PaymentAlreadyClaimedError";
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = schema.parse(await request.json());
     let isPaid = false;
     let appliedPromo: string | null = null;
     const normalizedPromo = body.promoCode?.trim().toUpperCase() ?? "";
+    const normalizedEmail = body.email.trim().toLowerCase();
 
     if (body.preview) {
       const recentPreview = await prisma.interviewSession.findFirst({
         where: {
           sessionType: "PRACTICE",
-          candidateEmail: body.email.toLowerCase(),
+          candidateEmail: normalizedEmail,
           promoCode: "PREVIEW",
           createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
         },
@@ -81,10 +89,7 @@ export async function POST(request: Request) {
             { status: 400 },
           );
         }
-        if (
-          promo.recipientEmail &&
-          promo.recipientEmail.toLowerCase() !== body.email.trim().toLowerCase()
-        ) {
+        if (promo.recipientEmail && promo.recipientEmail.toLowerCase() !== normalizedEmail) {
           return NextResponse.json(
             { error: "This promo code is assigned to a different email address." },
             { status: 400 },
@@ -105,7 +110,7 @@ export async function POST(request: Request) {
       if (
         payment &&
         payment.status === "VERIFIED" &&
-        payment.candidateEmail.toLowerCase() === body.email.toLowerCase() &&
+        payment.candidateEmail.toLowerCase() === normalizedEmail &&
         !payment.sessionId
       ) {
         isPaid = true;
@@ -130,37 +135,57 @@ export async function POST(request: Request) {
       durationMin: body.durationMin,
     });
 
-    const session = await prisma.interviewSession.create({
-      data: {
-        accessCode: generateAccessCode("PRC"),
-        sessionType: "PRACTICE",
-        candidateName: body.candidateName,
-        candidateEmail: body.email,
-        domain: body.domain,
-        topic: body.topic,
-        durationMin: body.durationMin,
-        isPaid,
-        promoCode: appliedPromo,
-        questions: {
-          create: tailoredQuestions.map((question, index) => ({
-            prompt: question.prompt,
-            expectedAnswer: question.expectedAnswer,
-            gradingRubric: question.gradingRubric,
-            difficulty: question.difficulty,
-            orderIndex: index,
-            isMandatory: true,
-          })),
+    const session = await prisma.$transaction(async (tx) => {
+      const created = await tx.interviewSession.create({
+        data: {
+          accessCode: generateAccessCode("PRC"),
+          sessionType: "PRACTICE",
+          candidateName: body.candidateName,
+          candidateEmail: normalizedEmail,
+          domain: body.domain,
+          topic: body.topic,
+          durationMin: body.durationMin,
+          isPaid,
+          promoCode: appliedPromo,
+          questions: {
+            create: tailoredQuestions.map((question, index) => ({
+              prompt: question.prompt,
+              expectedAnswer: question.expectedAnswer,
+              gradingRubric: question.gradingRubric,
+              difficulty: question.difficulty,
+              orderIndex: index,
+              isMandatory: true,
+            })),
+          },
         },
-        practicePayment: verifiedPaymentId
-          ? {
-              connect: { id: verifiedPaymentId },
-            }
-          : undefined,
-      },
+      });
+
+      if (verifiedPaymentId) {
+        // Atomic claim: only one concurrent start can attach this verified payment.
+        const claimed = await tx.practicePayment.updateMany({
+          where: {
+            id: verifiedPaymentId,
+            status: "VERIFIED",
+            sessionId: null,
+          },
+          data: { sessionId: created.id },
+        });
+        if (claimed.count === 0) {
+          throw new PaymentAlreadyClaimedError();
+        }
+      }
+
+      return created;
     });
 
     return NextResponse.json({ sessionId: session.id, accessCode: session.accessCode });
   } catch (error) {
+    if (error instanceof PaymentAlreadyClaimedError) {
+      return NextResponse.json(
+        { error: "This payment was already used to start an interview." },
+        { status: 409 },
+      );
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues[0]?.message }, { status: 400 });
     }

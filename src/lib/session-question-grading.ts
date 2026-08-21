@@ -21,9 +21,14 @@ export type SessionQuestionGradingResult = {
  */
 export async function gradeCompletedSessionQuestions(
   sessionId: string,
+  options?: { companyId?: string | null },
 ): Promise<SessionQuestionGradingResult | null> {
-  const session = await prisma.interviewSession.findUnique({
-    where: { id: sessionId, status: "COMPLETED" },
+  const session = await prisma.interviewSession.findFirst({
+    where: {
+      id: sessionId,
+      status: "COMPLETED",
+      ...(options?.companyId ? { companyId: options.companyId } : {}),
+    },
     include: {
       transcript: { orderBy: [{ orderIndex: "asc" }, { id: "asc" }] },
       questions: { orderBy: { orderIndex: "asc" } },

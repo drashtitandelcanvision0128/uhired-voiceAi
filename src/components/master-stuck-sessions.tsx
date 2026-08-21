@@ -101,6 +101,7 @@ export function MasterStuckSessionsPanel({
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null);
   const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
+  const [abandonBusy, setAbandonBusy] = useState(false);
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<MasterPageSize>(
@@ -338,6 +339,40 @@ export function MasterStuckSessionsPanel({
     }
   }
 
+  async function abandonStuckLiveSessions() {
+    const ok = await confirmDelete({
+      item: "stuck LIVE session",
+      count: data?.liveCount ?? 0,
+      message:
+        "LIVE interviews older than 1 hour will be marked FAILED (not deleted). Transcripts stay for review.",
+      confirmLabel: "Abandon stuck LIVE",
+    });
+    if (!ok) return;
+
+    setAbandonBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/master/sessions/stuck/abandon", { method: "POST" });
+      const payload = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        abandonedCount?: number;
+      };
+      if (!res.ok || !payload.ok) {
+        setError(payload.error ?? "Could not abandon stuck LIVE sessions.");
+        return;
+      }
+      await load();
+      notify.success(
+        payload.abandonedCount
+          ? `Abandoned ${payload.abandonedCount} stuck LIVE session(s).`
+          : "No stuck LIVE sessions needed abandoning.",
+      );
+    } finally {
+      setAbandonBusy(false);
+    }
+  }
+
   const isEmpty =
     !loading && !(data?.sessions.length ?? 0) && !(data?.liveCount ?? 0) && !(data?.stuckCount ?? 0);
 
@@ -365,11 +400,20 @@ export function MasterStuckSessionsPanel({
           <button
             type="button"
             onClick={() => void bulkDeleteSelectedSessions()}
-            disabled={bulkDeleteBusy || selectedSessionIds.size === 0}
+            disabled={bulkDeleteBusy || abandonBusy || selectedSessionIds.size === 0}
             className={`${masterRowActionDangerClass} inline-flex items-center gap-1.5 disabled:opacity-50`}
           >
             <Trash2 className="h-3.5 w-3.5" />
             {bulkDeleteBusy ? "Deleting…" : "Delete selected"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void abandonStuckLiveSessions()}
+            disabled={bulkDeleteBusy || abandonBusy || (data?.liveCount ?? 0) === 0}
+            className={`${masterBtnGhost} inline-flex items-center gap-1.5 disabled:opacity-50`}
+            title="Mark LIVE sessions older than 1 hour as FAILED"
+          >
+            {abandonBusy ? "Abandoning…" : "Abandon stuck LIVE"}
           </button>
         </div>
       ) : null}

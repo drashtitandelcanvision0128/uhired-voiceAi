@@ -1,7 +1,14 @@
-import crypto from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+
+function signaturesMatch(expectedHex: string, provided: string) {
+  const a = Buffer.from(expectedHex, "utf8");
+  const b = Buffer.from(provided, "utf8");
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
 
 export async function POST(request: Request) {
   const secret = env.razorpayWebhookSecret;
@@ -11,8 +18,8 @@ export async function POST(request: Request) {
 
   const body = await request.text();
   const signature = request.headers.get("x-razorpay-signature") ?? "";
-  const digest = crypto.createHmac("sha256", secret).update(body).digest("hex");
-  if (digest !== signature) {
+  const digest = createHmac("sha256", secret).update(body).digest("hex");
+  if (!signaturesMatch(digest, signature)) {
     return NextResponse.json({ error: "Invalid webhook signature." }, { status: 401 });
   }
 
@@ -41,7 +48,7 @@ export async function POST(request: Request) {
     });
   } else if (event === "payment.failed") {
     await prisma.practicePayment.updateMany({
-      where: { orderId },
+      where: { orderId, status: { not: "VERIFIED" } },
       data: { status: "FAILED", paymentId: paymentId ?? undefined },
     });
   }

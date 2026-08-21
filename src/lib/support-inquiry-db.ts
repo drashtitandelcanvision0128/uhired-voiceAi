@@ -24,6 +24,7 @@ type CreateSupportInquiryInput = {
   message: string;
   source: SupportInquirySource;
   clientIp?: string | null;
+  companyId?: string | null;
 };
 
 type ListSupportInquiryOptions = {
@@ -31,6 +32,7 @@ type ListSupportInquiryOptions = {
     createdAt?: { gte?: Date };
     status?: SupportInquiryStatus;
     source?: SupportInquirySource;
+    email?: string;
     search?: string;
   };
   take?: number;
@@ -56,6 +58,7 @@ function buildDelegateWhere(options: ListSupportInquiryOptions) {
   if (options.where?.createdAt?.gte) where.createdAt = { gte: options.where.createdAt.gte };
   if (options.where?.status) where.status = options.where.status;
   if (options.where?.source) where.source = options.where.source;
+  if (options.where?.email) where.email = options.where.email.toLowerCase();
   if (options.where?.search) {
     where.OR = [
       { name: { contains: options.where.search, mode: "insensitive" } },
@@ -96,6 +99,10 @@ async function listSupportInquiriesRaw(client: PrismaClient, options: ListSuppor
   if (options.where?.source) {
     filtered = filtered.filter((row) => row.source === options.where?.source);
   }
+  if (options.where?.email) {
+    const email = options.where.email.toLowerCase();
+    filtered = filtered.filter((row) => row.email.toLowerCase() === email);
+  }
   if (options.where?.search) {
     filtered = filtered.filter((row) => matchesSearch(row, options.where!.search!));
   }
@@ -115,6 +122,7 @@ export async function createSupportInquiry(client: PrismaClient, input: CreateSu
         message: input.message,
         source: input.source,
         clientIp: input.clientIp ?? null,
+        companyId: input.companyId ?? null,
       },
     });
   }
@@ -122,8 +130,8 @@ export async function createSupportInquiry(client: PrismaClient, input: CreateSu
   const id = crypto.randomUUID();
   const now = new Date();
   await client.$executeRaw`
-    INSERT INTO "SupportInquiry" ("id", "name", "email", "subject", "message", "source", "status", "clientIp", "createdAt", "updatedAt")
-    VALUES (${id}, ${input.name}, ${input.email.toLowerCase()}, ${input.subject}, ${input.message}, ${input.source}, 'NEW', ${input.clientIp ?? null}, ${now}, ${now})
+    INSERT INTO "SupportInquiry" ("id", "name", "email", "subject", "message", "source", "status", "companyId", "clientIp", "createdAt", "updatedAt")
+    VALUES (${id}, ${input.name}, ${input.email.toLowerCase()}, ${input.subject}, ${input.message}, ${input.source}, 'NEW', ${input.companyId ?? null}, ${input.clientIp ?? null}, ${now}, ${now})
   `;
 
   const rows = await client.$queryRaw<SupportInquiryRecord[]>`

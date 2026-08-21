@@ -19,6 +19,8 @@ import {
 import { generateUniqueCandidateInviteCode } from "@/lib/candidate-invite-code";
 import { dedupeEmails, validateEmailBatch } from "@/lib/parse-candidate-emails";
 import { sendInterviewInviteEmail, isEmailConfigured, getEmailSendDelayMs, sleep } from "@/lib/email";
+import { enqueueInterviewInviteEmail } from "@/lib/email-outbox";
+import { writePlatformAuditLog } from "@/lib/platform-audit-log";
 import { createInviteExpiresAt } from "@/lib/requirement-invite-expiry";
 import { isInterviewLanguageCode } from "@/lib/interview-languages";
 import { getEmailLinkBaseUrl, getPublicAppBaseUrl } from "@/lib/public-app-url";
@@ -278,8 +280,8 @@ export async function POST(request: Request) {
 
       if (existingInvite) {
         accessCode = await generateUniqueCandidateInviteCode(authCompany.companyName);
-        await prisma.requirementInvite.update({
-          where: { id: existingInvite.id },
+        await prisma.requirementInvite.updateMany({
+          where: { id: existingInvite.id, companyId: authCompany.companyId },
           data: {
             accessCode,
             source: "email",
@@ -341,6 +343,26 @@ export async function POST(request: Request) {
         const message = sendError instanceof Error ? sendError.message : "Unable to send email.";
         const status = classifySmtpError(message);
         const sesIamBlocked = /not authorized to perform `ses:SendEmail`|ses:SendEmail/i.test(message);
+        const retryable =
+          status === "rate_limited" || status === "send_failed" || status === "sandbox_restricted";
+        if (retryable) {
+          try {
+            await enqueueInterviewInviteEmail(
+              prisma,
+              {
+                to: email,
+                companyName: authCompany.companyName,
+                roleTitle,
+                accessCode,
+                interviewUrl,
+                expiresAt: inviteExpiresAt,
+              },
+              message,
+            );
+          } catch (enqueueError) {
+            console.error("[invite-candidates] email outbox enqueue failed:", enqueueError);
+          }
+        }
         results.push({
           email,
           accessCode,
@@ -355,12 +377,28 @@ export async function POST(request: Request) {
                 ? `Incorrect email — mail server rejected this address. (${message})`
                 : status === "sandbox_restricted"
                   ? `Not delivered — ${SES_SANDBOX_NOTE} (${message})`
-                  : message,
+                  : retryable
+                    ? `${message} (queued for automatic retry)`
+                    : message,
         });
       }
     }
 
     const summary = buildInviteDeliverySummary(results);
+
+    await writePlatformAuditLog(prisma, {
+      level: summary.failed > 0 ? "WARNING" : "INFO",
+      category: "INVITE",
+      title: "Candidate invites sent",
+      message: `Company ${authCompany.companyName}: sent=${summary.sent}, failed=${summary.failed}, invalid=${summary.invalid} for requirement ${requirement.id}.`,
+      metadata: {
+        companyId: authCompany.companyId,
+        requirementId: requirement.id,
+        sent: String(summary.sent),
+        failed: String(summary.failed),
+        invalid: String(summary.invalid),
+      },
+    });
 
     return NextResponse.json({
       requirementId: requirement.id,

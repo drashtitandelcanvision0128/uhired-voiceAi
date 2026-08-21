@@ -26,6 +26,7 @@ import {
   masterBtnPrimary,
 } from "@/components/master-ui";
 import { AppSelect } from "@/components/ui/app-select";
+import { describeScoringMode, SCORING_FAIRNESS_NOTE } from "@/lib/scoring-trust";
 
 export type AdminSessionDetail = {
   id: string;
@@ -383,6 +384,9 @@ export function AdminSessionDetailModal({
                 </p>
                 <p className="mt-2 text-sm leading-relaxed text-foreground/90">
                   {session.scorecard.summary}
+                </p>
+                <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+                  {describeScoringMode(session.scorecard.scoringMode)}. {SCORING_FAIRNESS_NOTE}
                 </p>
               </div>
 

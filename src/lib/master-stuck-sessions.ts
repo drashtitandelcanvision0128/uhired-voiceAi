@@ -145,3 +145,73 @@ export async function deleteMasterStuckSession(
 
   return { ok: true };
 }
+
+/** LIVE sessions whose interview clock started before this cutoff are reclaimable. */
+export function buildAbandonableLiveSessionWhere(
+  now = Date.now(),
+  ageMs = STUCK_SESSION_AGE_MS,
+): Prisma.InterviewSessionWhereInput {
+  const cutoff = new Date(now - ageMs);
+  return {
+    status: "LIVE",
+    OR: [
+      { startedAt: { lt: cutoff } },
+      // LIVE without startedAt: fall back to last update / create time.
+      { startedAt: null, updatedAt: { lt: cutoff } },
+    ],
+  };
+}
+
+/**
+ * Marks stuck LIVE interviews as FAILED so they stop blocking ops dashboards.
+ * Does not touch READY (scheduled / waiting invites).
+ */
+export async function abandonStuckLiveSessions(
+  prisma: PrismaClient,
+  options: { limit?: number; ageMs?: number; actor?: string } = {},
+): Promise<{ abandonedCount: number; sessionIds: string[] }> {
+  const limit = Math.min(Math.max(options.limit ?? 50, 1), 200);
+  const ageMs = options.ageMs ?? STUCK_SESSION_AGE_MS;
+  const where = buildAbandonableLiveSessionWhere(Date.now(), ageMs);
+
+  const candidates = await prisma.interviewSession.findMany({
+    where,
+    orderBy: [{ startedAt: "asc" }, { updatedAt: "asc" }],
+    take: limit,
+    select: {
+      id: true,
+      sessionType: true,
+      candidateEmail: true,
+      candidateName: true,
+      startedAt: true,
+    },
+  });
+
+  if (candidates.length === 0) {
+    return { abandonedCount: 0, sessionIds: [] };
+  }
+
+  const endedAt = new Date();
+  const ids = candidates.map((session) => session.id);
+  const result = await prisma.interviewSession.updateMany({
+    where: { id: { in: ids }, status: "LIVE" },
+    data: { status: "FAILED", endedAt },
+  });
+
+  if (result.count > 0) {
+    await writePlatformAuditLog(prisma, {
+      level: "WARNING",
+      category: "SESSION",
+      title: "Stuck LIVE sessions auto-abandoned",
+      message: `Marked ${result.count} stuck LIVE session(s) as FAILED (${options.actor ?? "system"}).`,
+      metadata: {
+        abandonedCount: String(result.count),
+        sessionIds: ids.join(","),
+        ageMs: String(ageMs),
+        actor: options.actor ?? "system",
+      },
+    });
+  }
+
+  return { abandonedCount: result.count, sessionIds: ids };
+}

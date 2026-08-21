@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { COMPANY_ADMIN_COOKIE } from "@/lib/session-cookies";
-import { verifyCompanySessionToken } from "@/lib/company-admin-auth";
+import { COMPANY_ADMIN_COOKIE, MASTER_SESSION_COOKIE } from "@/lib/session-cookies";
 import {
+  getCompanySessionSecretFromEnv,
   getMasterSessionSecretFromEnv,
+  verifyCompanySessionTokenEdge,
   verifyMasterSessionTokenEdge,
 } from "@/lib/edge-session-verify";
-import { MASTER_SESSION_COOKIE } from "@/lib/session-cookies";
 
 const SECURITY_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
@@ -30,8 +30,9 @@ function applySecurityHeaders(response: NextResponse) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  const companySecret = getCompanySessionSecretFromEnv();
   const companyCookie = request.cookies.get(COMPANY_ADMIN_COOKIE)?.value?.trim() ?? "";
-  const isCompanyAuthenticated = await verifyCompanySessionToken(companyCookie);
+  const isCompanyAuthenticated = await verifyCompanySessionTokenEdge(companyCookie, companySecret);
 
   const masterSecret = getMasterSessionSecretFromEnv();
   const masterCookie = request.cookies.get(MASTER_SESSION_COOKIE)?.value?.trim() ?? "";

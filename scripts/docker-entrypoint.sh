@@ -20,7 +20,14 @@ prepare_supabase_migrate_url() {
   esac
 }
 
-if [ -n "$DATABASE_URL" ]; then
+# Dual-repo / multi-replica safety: only one service should migrate.
+# Set RUN_MIGRATIONS=false on API replicas or the frontend when the backend owns migrations.
+should_run_migrations=true
+case "${RUN_MIGRATIONS:-true}" in
+  0|false|FALSE|no|NO|off|OFF) should_run_migrations=false ;;
+esac
+
+if [ -n "$DATABASE_URL" ] && [ "$should_run_migrations" = "true" ]; then
   if [ -n "$DIRECT_URL" ]; then
     migrate_url=$(prepare_supabase_migrate_url "$DIRECT_URL")
     if [ "$migrate_url" != "$DIRECT_URL" ]; then
@@ -42,6 +49,8 @@ if [ -n "$DATABASE_URL" ]; then
   echo "[entrypoint] Applying pending Prisma migrations..."
   "$PRISMA" migrate deploy --schema=./prisma/schema.prisma
   echo "[entrypoint] Migrations complete."
+elif [ "$should_run_migrations" = "false" ]; then
+  echo "[entrypoint] RUN_MIGRATIONS=false — skipping migrations (another service owns them)."
 else
   echo "[entrypoint] DATABASE_URL is not set — skipping migrations."
 fi

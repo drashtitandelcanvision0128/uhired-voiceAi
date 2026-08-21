@@ -8,6 +8,11 @@ import { keySkillsForDb, resolveSessionKeySkills } from "@/lib/session-key-skill
 import { normalizeEmail } from "@/lib/parse-candidate-emails";
 import { getInviteAccessState } from "@/lib/requirement-invite-expiry";
 import { lookupInterviewByAccessCode } from "@/lib/interview-access-code";
+import {
+  checkRateLimitAsync,
+  getClientIpFromRequest,
+  rateLimitResponse,
+} from "@/lib/rate-limit";
 
 const schema = z.object({
   accessCode: z.string().trim().min(1),
@@ -17,6 +22,12 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const clientIp = getClientIpFromRequest(request);
+    const rate = await checkRateLimitAsync("candidate-verify", clientIp, 20, 15 * 60 * 1000);
+    if (!rate.allowed) {
+      return NextResponse.json(rateLimitResponse(rate.retryAfterSec), { status: 429 });
+    }
+
     const body = schema.parse(await request.json());
     const normalizedEmail = normalizeEmail(body.email);
     const accessCode = body.accessCode.trim();
@@ -58,7 +69,8 @@ export async function POST(request: Request) {
     if (liveAttempt) {
       return NextResponse.json(
         {
-          error: "This interview is already in progress and cannot be reopened from the invite link.",
+          error:
+            "This interview is already in progress on another browser/device. Continue from the same browser where you started, or ask the company for a new invite if you lost access.",
         },
         { status: 409 },
       );
@@ -155,8 +167,8 @@ export async function POST(request: Request) {
         });
       }
       if (invite && !invite.usedAt) {
-        await prisma.requirementInvite.update({
-          where: { id: invite.id },
+        await prisma.requirementInvite.updateMany({
+          where: { id: invite.id, companyId: requirement.companyId, usedAt: null },
           data: { usedAt: new Date() },
         });
       }
@@ -196,51 +208,70 @@ export async function POST(request: Request) {
       candidateId = createdCandidate.id;
     }
 
-    const createdAttempt = await prisma.interviewSession.create({
-      data: {
-        accessCode: generateAccessCode("CMP"),
-        sessionType: "COMPANY",
-        status: "READY",
-        isPaid: true,
-        companyId: requirement.companyId,
-        companyName: null,
-        requirementId: requirement.id,
-        candidateId,
-        candidateName: body.candidateName,
-        candidateEmail: normalizedEmail,
-        positionTitle: requirement.title ?? requirement.topic,
-        domain: requirement.domain,
-        topic: requirement.topic,
-        durationMin: requirement.durationMin,
-        jobDescription: requirement.jobDescription,
-        keySkills: requirementKeySkills,
-        maxOptionalQuestions: requirement.maxOptionalQuestions,
-        questions: {
-          create: requirement.questions.map((q, index) => ({
-            prompt: q.prompt,
-            expectedAnswer: q.expectedAnswer,
-            gradingRubric: q.gradingRubric,
-            difficulty: q.difficulty ?? "medium",
-            orderIndex: index,
-            isMandatory: q.isMandatory,
-          })),
-        },
-      },
-      select: { id: true },
-    });
+    let createdAttempt: { id: string };
+    try {
+      createdAttempt = await prisma.$transaction(async (tx) => {
+        // Claim invite atomically so concurrent verifies cannot both create sessions.
+        if (invite) {
+          const claimed = await tx.requirementInvite.updateMany({
+            where: { id: invite.id, companyId: requirement.companyId, usedAt: null },
+            data: { usedAt: new Date() },
+          });
+          if (claimed.count === 0) {
+            throw new Error("INVITE_ALREADY_USED");
+          }
+        }
+
+        return tx.interviewSession.create({
+          data: {
+            accessCode: generateAccessCode("CMP"),
+            sessionType: "COMPANY",
+            status: "READY",
+            isPaid: true,
+            companyId: requirement.companyId,
+            companyName: null,
+            requirementId: requirement.id,
+            candidateId,
+            candidateName: body.candidateName,
+            candidateEmail: normalizedEmail,
+            positionTitle: requirement.title ?? requirement.topic,
+            domain: requirement.domain,
+            topic: requirement.topic,
+            durationMin: requirement.durationMin,
+            jobDescription: requirement.jobDescription,
+            keySkills: requirementKeySkills,
+            maxOptionalQuestions: requirement.maxOptionalQuestions,
+            questions: {
+              create: requirement.questions.map((q, index) => ({
+                prompt: q.prompt,
+                expectedAnswer: q.expectedAnswer,
+                gradingRubric: q.gradingRubric,
+                difficulty: q.difficulty ?? "medium",
+                orderIndex: index,
+                isMandatory: q.isMandatory,
+              })),
+            },
+          },
+          select: { id: true },
+        });
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "INVITE_ALREADY_USED") {
+        return NextResponse.json(
+          {
+            error: "This interview code has already been used. Please ask the company to send a new invite.",
+          },
+          { status: 409 },
+        );
+      }
+      throw error;
+    }
 
     const response = NextResponse.json({ sessionId: createdAttempt.id });
     try {
       setCandidateInterviewSessionCookie(response, createdAttempt.id, normalizedEmail);
     } catch {
       // Keep candidate flow available even if session cookie secret is not configured.
-    }
-
-    if (invite) {
-      await prisma.requirementInvite.update({
-        where: { id: invite.id },
-        data: { usedAt: new Date() },
-      });
     }
 
     return response;

@@ -1,8 +1,13 @@
-# Auto-deploy to Coolify on every push.
+# Auto-deploy to Coolify on every push to main / version-0.1.
 # Coolify UI also has "Auto Deploy" (webhook) — use either that OR this workflow.
 #
 # Setup (GitHub → Settings → Secrets and variables → Actions):
 #   COOLIFY_WEBHOOK_URL = Deploy Webhook URL from Coolify → Application → Webhooks
+#
+# Coolify app env (recommended with this workflow):
+#   CRON_SECRET, CANDIDATE_INTERVIEW_SESSION_SECRET, APP_ENV=production
+#   RUN_MIGRATIONS=true on the primary app only (set false on API replicas)
+# Schedule POST /api/cron/maintenance every 15–30 min with Authorization: Bearer $CRON_SECRET
 name: Coolify Auto Deploy
 
 on:

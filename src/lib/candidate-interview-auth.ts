@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
-import type { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { CANDIDATE_INTERVIEW_COOKIE } from "@/lib/session-cookies";
 
@@ -17,8 +17,31 @@ function getCandidateInterviewSecret() {
   return env.candidateInterviewSessionSecret;
 }
 
+/**
+ * Company interview APIs must require the candidate session cookie in production.
+ * In non-production, guard stays optional so local smoke tests can skip the secret.
+ */
 export function isCandidateInterviewSessionGuardEnabled() {
+  if (env.isProduction) {
+    return true;
+  }
   return Boolean(getCandidateInterviewSecret());
+}
+
+/** Returns a 401 response when COMPANY interview access cookie is missing/mismatched. */
+export function getUnauthorizedCompanyInterviewResponse(
+  request: Request,
+  sessionId: string,
+  sessionType: string,
+): NextResponse | null {
+  if (sessionType !== "COMPANY" || !isCandidateInterviewSessionGuardEnabled()) {
+    return null;
+  }
+  const candidateSession = getCandidateInterviewSessionFromCookieHeader(request.headers.get("cookie"));
+  if (!candidateSession || candidateSession.sessionId !== sessionId) {
+    return NextResponse.json({ error: "Unauthorized interview session access." }, { status: 401 });
+  }
+  return null;
 }
 
 function encodeBase64Url(value: string) {

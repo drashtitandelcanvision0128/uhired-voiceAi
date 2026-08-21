@@ -51,12 +51,19 @@ export async function syncInterviewSessionsForCandidate(
 export async function syncCandidateFromSession(
   tx: Prisma.TransactionClient,
   candidateId: string | null | undefined,
-  data: { candidateName?: string; candidateEmail?: string },
+  data: { candidateName?: string; candidateEmail?: string; companyId?: string },
 ): Promise<void> {
   if (!candidateId) return;
   const candidateUpdate: { name?: string; email?: string } = {};
   if (data.candidateName !== undefined) candidateUpdate.name = data.candidateName;
   if (data.candidateEmail !== undefined) candidateUpdate.email = data.candidateEmail.toLowerCase();
   if (Object.keys(candidateUpdate).length === 0) return;
+  if (data.companyId) {
+    await tx.candidate.updateMany({
+      where: { id: candidateId, companyId: data.companyId },
+      data: candidateUpdate,
+    });
+    return;
+  }
   await tx.candidate.update({ where: { id: candidateId }, data: candidateUpdate });
 }

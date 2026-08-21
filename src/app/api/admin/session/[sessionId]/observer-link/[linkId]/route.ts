@@ -24,8 +24,8 @@ export async function DELETE(request: Request, context: Context) {
     return NextResponse.json({ ok: true });
   }
 
-  await prisma.interviewObserverLink.update({
-    where: { id: linkId },
+  await prisma.interviewObserverLink.updateMany({
+    where: { id: linkId, sessionId, companyId: auth.companyId, revokedAt: null },
     data: { revokedAt: new Date() },
   });
 

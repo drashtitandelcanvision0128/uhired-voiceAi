@@ -26,7 +26,9 @@ export async function POST(request: Request, context: Context) {
     return NextResponse.json({ error: "Completed session not found." }, { status: 404 });
   }
 
-  const result = await gradeCompletedSessionQuestions(sessionId);
+  const result = await gradeCompletedSessionQuestions(sessionId, {
+    companyId: authCompany.companyId,
+  });
   if (!result) {
     return NextResponse.json(
       {

@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get("pageSize") ?? "10") || 10));
   const search = url.searchParams.get("search")?.trim() ?? "";
   const statusParam = url.searchParams.get("status")?.trim().toUpperCase() ?? "";
-  const validStatuses = ["READY", "LIVE", "COMPLETED"] as const;
+  const validStatuses = ["READY", "LIVE", "COMPLETED", "FAILED"] as const;
   const statusFilter = validStatuses.includes(statusParam as (typeof validStatuses)[number])
     ? (statusParam as (typeof validStatuses)[number])
     : undefined;

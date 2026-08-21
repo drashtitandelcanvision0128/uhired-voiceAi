@@ -290,12 +290,14 @@ export const MASTER_SESSION_STATUS_STYLES: Record<string, string> = {
   LIVE: "bg-destructive/12 text-destructive ring-destructive/25",
   READY: "bg-primary/12 text-primary ring-primary/25",
   COMPLETED: "bg-success/12 text-success ring-success/25",
+  FAILED: "bg-muted text-muted-foreground ring-border",
 };
 
 export function formatMasterStatus(status: string) {
   if (status === "LIVE") return "Live";
   if (status === "READY") return "Ready";
   if (status === "COMPLETED") return "Completed";
+  if (status === "FAILED") return "Failed";
   if (!status) return "—";
   return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 }

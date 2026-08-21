@@ -13,7 +13,7 @@ const serverEnvSchema = z.object({
   VERCEL: optionalString,
   VERCEL_ENV: optionalString,
 
-  DATABASE_URL: z.string().min(1),
+  DATABASE_URL: optionalString,
   DIRECT_URL: optionalString,
   DATABASE_CONNECTION_LIMIT: optionalString,
   DATABASE_POOL_TIMEOUT: optionalString,
@@ -87,6 +87,8 @@ const serverEnvSchema = z.object({
   COMPANY_OIDC_SCOPES: optionalString,
   COMPANY_OIDC_AUTO_PROVISION: optionalString,
   PHASE_7B_ENABLED: optionalString,
+  // Cron / scheduler secret for POST /api/cron/abandon-stuck-sessions
+  CRON_SECRET: optionalString,
 });
 
 const publicEnvSchema = z.object({
@@ -127,11 +129,19 @@ function parsePublicEnv() {
   return parsed.data;
 }
 
+/** True while `next build` collects page data — secrets come from Coolify at runtime. */
+function isNextProductionBuild() {
+  return process.env.NEXT_PHASE === "phase-production-build";
+}
+
 function requireInProduction(
   appEnv: AppEnvironment,
   label: string,
   value: string | undefined,
 ): string | undefined {
+  if (isNextProductionBuild()) {
+    return value?.trim() || undefined;
+  }
   if (appEnv === "production" && !value?.trim()) {
     throw new Error(`${label} is required in production (APP_ENV=production).`);
   }
@@ -144,13 +154,16 @@ function buildEnv() {
   const appEnv = getAppEnvironment();
   const nodeEnv = server.NODE_ENV ?? "development";
   const isProduction = appEnv === "production";
+  const skipRuntimeSecretChecks = isNextProductionBuild();
 
-  const databaseUrl = server.DATABASE_URL.trim();
-  if (!databaseUrl) {
+  const databaseUrl = (server.DATABASE_URL ?? "").trim();
+  if (!databaseUrl && !skipRuntimeSecretChecks) {
     throw new Error("DATABASE_URL is required.");
   }
 
-  const openAiKey = requireInProduction(appEnv, "OPENAI_API_KEY", server.OPENAI_API_KEY);
+  // OpenAI is required for interview/scoring features, but do not fail the whole
+  // process boot (auth, health, login pages) when it is temporarily unset.
+  const openAiKey = server.OPENAI_API_KEY?.trim() || undefined;
   const companySessionSecret =
     server.COMPANY_SESSION_SECRET?.trim() || server.ADMIN_PORTAL_KEY?.trim() || "";
   const masterSessionSecret =
@@ -161,9 +174,14 @@ function buildEnv() {
     server.ADMIN_PORTAL_KEY?.trim() ||
     "";
 
-  if (isProduction) {
+  if (isProduction && !skipRuntimeSecretChecks) {
     requireInProduction(appEnv, "COMPANY_SESSION_SECRET or ADMIN_PORTAL_KEY", companySessionSecret);
     requireInProduction(appEnv, "MASTER_SESSION_SECRET or MASTER_ADMIN_KEY", masterSessionSecret);
+    requireInProduction(
+      appEnv,
+      "CANDIDATE_INTERVIEW_SESSION_SECRET (or COMPANY_SESSION_SECRET / ADMIN_PORTAL_KEY)",
+      candidateSessionSecret,
+    );
   }
 
   return {
@@ -171,8 +189,12 @@ function buildEnv() {
     nodeEnv,
     isProduction,
     isVercel: Boolean(server.VERCEL),
-    databaseUrl,
-    directUrl: server.DIRECT_URL?.trim() || databaseUrl,
+    databaseUrl:
+      databaseUrl || "postgresql://build:build@127.0.0.1:5432/build?schema=public",
+    directUrl:
+      server.DIRECT_URL?.trim() ||
+      databaseUrl ||
+      "postgresql://build:build@127.0.0.1:5432/build?schema=public",
     databaseConnectionLimit: server.DATABASE_CONNECTION_LIMIT?.trim() || "15",
     databasePoolTimeout: server.DATABASE_POOL_TIMEOUT?.trim() || "30",
 
@@ -207,7 +229,20 @@ function buildEnv() {
     razorpayWebhookSecret: server.RAZORPAY_WEBHOOK_SECRET?.trim() || "",
     practiceBasePriceRupees: Number(server.PRACTICE_BASE_PRICE_RUPEES?.trim() || "25"),
 
-    videoStorageProvider: server.VIDEO_STORAGE_PROVIDER?.trim() || "local",
+    videoStorageProvider: (() => {
+      const explicit = server.VIDEO_STORAGE_PROVIDER?.trim().toLowerCase() || "";
+      if (explicit) return explicit;
+      // Production default: prefer S3 when AWS credentials are present (avoid ephemeral local disk).
+      if (
+        isProduction &&
+        server.AWS_S3_BUCKET?.trim() &&
+        server.AWS_ACCESS_KEY_ID?.trim() &&
+        server.AWS_SECRET_ACCESS_KEY?.trim()
+      ) {
+        return "s3";
+      }
+      return "local";
+    })(),
     awsRegion: server.AWS_REGION?.trim() || "ap-south-1",
     awsS3Bucket: server.AWS_S3_BUCKET?.trim() || "",
     awsAccessKeyId: server.AWS_ACCESS_KEY_ID?.trim() || "",

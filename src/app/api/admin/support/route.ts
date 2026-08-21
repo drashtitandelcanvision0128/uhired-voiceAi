@@ -34,20 +34,18 @@ export async function GET(request: Request) {
 
     const adminEmail = company.adminEmail.toLowerCase();
     const inquiries = await listSupportInquiries(prisma, {
-      where: { source: "COMPANY_ADMIN" },
+      where: { source: "COMPANY_ADMIN", email: adminEmail },
       take: 50,
     });
 
-    const tickets = inquiries
-      .filter((row) => row.email.toLowerCase() === adminEmail)
-      .map((row) => ({
-        id: row.id,
-        subject: row.subject,
-        message: row.message,
-        status: row.status,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
-      }));
+    const tickets = inquiries.map((row) => ({
+      id: row.id,
+      subject: row.subject,
+      message: row.message,
+      status: row.status,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }));
 
     return NextResponse.json({ tickets });
   } catch (error) {
@@ -90,6 +88,7 @@ export async function POST(request: Request) {
       message,
       source: "COMPANY_ADMIN",
       clientIp: getClientIp(request),
+      companyId: authCompany.companyId,
     });
 
     return NextResponse.json({

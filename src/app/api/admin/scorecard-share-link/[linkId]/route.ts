@@ -23,8 +23,8 @@ export async function DELETE(_request: Request, context: Context) {
     return NextResponse.json({ ok: true });
   }
 
-  await prisma.scorecardShareLink.update({
-    where: { id: linkId },
+  await prisma.scorecardShareLink.updateMany({
+    where: { id: linkId, companyId: auth.companyId, revokedAt: null },
     data: { revokedAt: new Date() },
   });
 

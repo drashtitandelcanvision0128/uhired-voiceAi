@@ -42,6 +42,7 @@ const platformNavItems = [
   { href: "/master/interview-analytics", label: "Interview analytics", icon: BarChart3 },
   { href: "/master/practice-sessions", label: "Practice interviews", icon: ScrollText },
   { href: "/master/stuck-sessions", label: "Stuck interviews", icon: AlertTriangle },
+  { href: "/master/data-deletion-requests", label: "Data deletion", icon: Shield },
   { href: "/master/payments", label: "Payments", icon: CreditCard },
   { href: "/master/promo-codes", label: "Promo codes", icon: TicketPercent },
   { href: "/master/user-analytics", label: "User analytics", icon: BarChart3 },

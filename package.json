@@ -16,6 +16,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:hash:company-passcodes": "node scripts/hash-company-passcodes.mjs",
+    "sessions:abandon-stuck": "node --env-file=.env scripts/abandon-stuck-sessions.mjs",
     "data:retention:cleanup": "npx tsx scripts/data-retention-cleanup.mjs",
     "test:privacy": "npx tsx --import ./scripts/stubs/register-server-only-stub.mjs --env-file=.env scripts/test-privacy-phase6.mjs",
     "test:privacy:api": "npx tsx --import ./scripts/stubs/register-server-only-stub.mjs --env-file=.env scripts/test-privacy-api-integration.mjs",

@@ -1,6 +1,7 @@
 /**
  * Edge-runtime session verification for middleware (Web Crypto API).
- * Mirrors signing logic in master-auth.ts without Node `crypto`.
+ * Mirrors signing logic in master-auth / company-admin-auth without Node `crypto`
+ * or `server-only` modules (those crash Edge middleware).
  */
 
 function encodeBase64Url(bytes: Uint8Array) {
@@ -45,7 +46,7 @@ function timingSafeEqualAscii(a: string, b: string) {
   return diff === 0;
 }
 
-export async function verifyMasterSessionTokenEdge(
+async function verifySignedSessionTokenEdge(
   token: string | undefined | null,
   secret: string,
 ): Promise<boolean> {
@@ -67,6 +68,24 @@ export async function verifyMasterSessionTokenEdge(
   }
 }
 
+export async function verifyMasterSessionTokenEdge(
+  token: string | undefined | null,
+  secret: string,
+): Promise<boolean> {
+  return verifySignedSessionTokenEdge(token, secret);
+}
+
+export async function verifyCompanySessionTokenEdge(
+  token: string | undefined | null,
+  secret: string,
+): Promise<boolean> {
+  return verifySignedSessionTokenEdge(token, secret);
+}
+
 export function getMasterSessionSecretFromEnv() {
   return process.env.MASTER_SESSION_SECRET?.trim() || process.env.MASTER_ADMIN_KEY?.trim() || "";
+}
+
+export function getCompanySessionSecretFromEnv() {
+  return process.env.COMPANY_SESSION_SECRET?.trim() || process.env.ADMIN_PORTAL_KEY?.trim() || "";
 }
