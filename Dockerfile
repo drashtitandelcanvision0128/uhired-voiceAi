@@ -9,10 +9,12 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json* ./
 # VPS builds can hit transient npm registry drops (ECONNRESET) — retry downloads.
+# Coolify often injects NODE_ENV=production at build time; --include=dev keeps
+# Tailwind/PostCSS/TypeScript available for `next build`.
 RUN npm config set fetch-retries 5 \
   && npm config set fetch-retry-mintimeout 20000 \
   && npm config set fetch-retry-maxtimeout 120000 \
-  && npm ci --no-audit --no-fund
+  && npm ci --include=dev --no-audit --no-fund
 
 # Rebuild the source code only when needed
 FROM base AS builder
